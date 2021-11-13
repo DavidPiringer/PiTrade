@@ -4,15 +4,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Exchange.Domain
+namespace PiTrade.Exchange.Entities
 {
-  public class OrderType
+  public class OrderSide
   {
-    public static OrderType BUY => new OrderType("BUY");
-    public static OrderType SELL => new OrderType("SELL");
+    public static OrderSide BUY => new OrderSide("BUY");
+    public static OrderSide SELL => new OrderSide("SELL");
 
     private string Value { get; set; }
-    public OrderType(string value)
+    public OrderSide(string value)
     {
       Value = value;
     }
