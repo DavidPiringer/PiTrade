@@ -29,12 +29,18 @@ namespace PiTrade.Exchange.Binance
 
     public async Task<string> Send(string requestUri, HttpMethod method, IDictionary<string, object> query, object? content = null)
     {
+      if (query == null)
+        query = new Dictionary<string, object>();
+
       var queryString = PrepareQueryString(query, false);
       return await SendRequest($"{requestUri}?{queryString}", method, content);
     }
 
-    public async Task<string> SendSigned(string requestUri, HttpMethod method, IDictionary<string, object> query, object? content = null)
+    public async Task<string> SendSigned(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null)
     {
+      if(query == null)
+        query = new Dictionary<string, object>();
+
       var queryString = PrepareQueryString(query);
       return await SendRequest($"{requestUri}?{queryString}", method, content);
     }

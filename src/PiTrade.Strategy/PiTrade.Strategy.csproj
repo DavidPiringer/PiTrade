@@ -1,16 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-	<InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PiTrade.Exchange\PiTrade.Exchange.csproj" />
-    <ProjectReference Include="..\PiTrade.Strategy\PiTrade.Strategy.csproj" />
   </ItemGroup>
 
 </Project>

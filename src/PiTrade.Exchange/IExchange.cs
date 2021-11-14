@@ -17,6 +17,6 @@ namespace PiTrade.Exchange
     Task Cancel(Order order);
     Task CancelAll(Market market);
     IExchangeFeed GetFeed(Market market);
-    // TODO: get wallet
+    Task<IReadOnlyDictionary<string, decimal>> GetFunds();
   }
 }

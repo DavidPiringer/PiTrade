@@ -21,12 +21,12 @@ namespace PiTrade.Exchange.Binance
 
     private IList<Order> activeOrders = new List<Order>();
     public IEnumerable<Order> ActiveOrders => activeOrders;
-
+    
 
     // TODO
     public IEnumerable<Market> AvailableMarkets { get; } = Enumerable.Empty<Market>();
 
-
+    private static readonly object locker = new object();
 
     public BinanceExchange(string key, string secret)
     {
@@ -47,7 +47,8 @@ namespace PiTrade.Exchange.Binance
       var order = await NewOrder(OrderSide.BUY, market,
         price.RoundDown(market.QuotePrecision),
         quantity.RoundUp(market.AssetPrecision));
-      activeOrders.Add(order);
+      lock(locker)
+        activeOrders.Add(order);
       return order;
     }
 
@@ -56,18 +57,29 @@ namespace PiTrade.Exchange.Binance
       var order = await NewOrder(OrderSide.SELL, market, 
         price.RoundUp(market.QuotePrecision), 
         quantity.RoundDown(market.AssetPrecision));
-      activeOrders.Add(order);
+      lock (locker)
+        activeOrders.Add(order);
       return order;
     }
 
-    public async Task Cancel(Order order) =>
+    public async Task Cancel(Order order)
+    {
       await BinanceHttpWrapper.SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
-      { {"symbol", order.Market.ToString()}, 
+      { {"symbol", order.Market.ToString()},
         {"orderId", order.Id.ToString()} });
+      lock (locker) // TODO: rework
+        activeOrders = ActiveOrders.Where(x => x.Id != order.Id).ToList();
+    }
+      
 
-    public async Task CancelAll(Market market) =>
+    public async Task CancelAll(Market market)
+    {
       await BinanceHttpWrapper.SendSigned("/api/v3/openOrders", HttpMethod.Delete, new Dictionary<string, object>()
       { {"symbol", market.ToString()} });
+      lock (locker)
+        activeOrders.Clear();
+    }
+      
 
     public IExchangeFeed GetFeed(Market market) => new BinanceFeed(this, market);
 
@@ -110,6 +122,24 @@ namespace PiTrade.Exchange.Binance
       }*/
       Console.WriteLine(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
       Console.WriteLine(response);
+    }
+
+    public async Task<IReadOnlyDictionary<string, decimal>> GetFunds()
+    {
+      var response = await BinanceHttpWrapper.SendSigned("/api/v3/account", HttpMethod.Get);
+      var balances = JObject.Parse(response)["balances"]?.ToArray();
+      Dictionary<string,decimal> funds = new Dictionary<string, decimal>();
+      if(balances != null)
+      {
+        foreach(var balance in balances)
+        {
+          var symStr = balance["asset"]?.ToString();
+          var qty = balance["free"]?.ToObject<decimal>();
+          if(symStr != null && qty.HasValue)
+            funds.Add(symStr.Trim().ToUpper(), qty.Value);
+        }
+      }
+      return funds;
     }
   }
 }

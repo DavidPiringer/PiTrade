@@ -29,18 +29,25 @@ namespace PiTrade.Exchange.Binance
       var oidBuyer = json["b"]?.ToObject<int>();
       var oidSeller = json["a"]?.ToObject<int>();
 
-      foreach(var order in Exchange.ActiveOrders)
+      foreach(var order in new List<Order>(Exchange.ActiveOrders))
       {
         if(order.Id == oidBuyer && quantity.HasValue)
         {
           order.Fill(quantity.Value);
-          var tmp = OnBuy?.Invoke(order);
-          if (tmp != null) await tmp;
+          if (order.IsFilled)
+          {
+            var tmp = OnBuy?.Invoke(order);
+            if (tmp != null) await tmp;
+          }
+          
         } else if (order.Id == oidSeller && quantity.HasValue)
         {
           order.Fill(quantity.Value);
-          var tmp = OnSell?.Invoke(order);
-          if (tmp != null) await tmp;
+          if(order.IsFilled)
+          {
+            var tmp = OnSell?.Invoke(order);
+            if (tmp != null) await tmp;
+          }
         }
       }
 

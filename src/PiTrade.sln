@@ -5,7 +5,9 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PiTrade", "PiTrade\PiTrade.csproj", "{B920D8FB-3DEA-4696-8659-5C2F5B17976F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PiTrade.Exchange", "PiTrade.Exchange\PiTrade.Exchange.csproj", "{1807232D-CCA1-4685-8B08-4C20518A1082}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PiTrade.Exchange", "PiTrade.Exchange\PiTrade.Exchange.csproj", "{1807232D-CCA1-4685-8B08-4C20518A1082}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PiTrade.Strategy", "PiTrade.Strategy\PiTrade.Strategy.csproj", "{745E1A66-B1C2-4BAC-96C4-CABCB7B444DC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{1807232D-CCA1-4685-8B08-4C20518A1082}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1807232D-CCA1-4685-8B08-4C20518A1082}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1807232D-CCA1-4685-8B08-4C20518A1082}.Release|Any CPU.Build.0 = Release|Any CPU
+		{745E1A66-B1C2-4BAC-96C4-CABCB7B444DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{745E1A66-B1C2-4BAC-96C4-CABCB7B444DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{745E1A66-B1C2-4BAC-96C4-CABCB7B444DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{745E1A66-B1C2-4BAC-96C4-CABCB7B444DC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
