@@ -19,6 +19,7 @@ namespace PiTrade.Exchange.Entities
     public static Symbol PORTO => new Symbol("PORTO");
     public static Symbol GALA => new Symbol("GALA");
     public static Symbol DOGE => new Symbol("DOGE");
+    public static Symbol MANA => new Symbol("MANA");
     public static Symbol EUR => new Symbol("EUR");
     public static Symbol USDT => new Symbol("USDT");
 
@@ -31,5 +32,9 @@ namespace PiTrade.Exchange.Entities
 
     public override string ToString() => Value.ToUpper();
     public override int GetHashCode() => Value.GetHashCode();
+    public override bool Equals(object? obj) => obj is Symbol other && Value == other.Value;
+
+    public static bool operator ==(Symbol lhs, Symbol rhs) => lhs.Equals(rhs);
+    public static bool operator !=(Symbol lhs, Symbol rhs) => !(lhs == rhs);
   }
 }

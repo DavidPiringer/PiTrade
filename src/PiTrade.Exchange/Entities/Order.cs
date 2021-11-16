@@ -9,14 +9,14 @@ namespace PiTrade.Exchange.Entities
   public class Order
   {
     public int Id { get; private set; }
-    public Market Market { get; private set; }
+    public IMarket Market { get; private set; }
     public OrderSide Side { get; private set; }
     public decimal Price { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal ExecutedQuantity { get; private set; } = 0;
     public bool IsFilled => Quantity <= ExecutedQuantity;
 
-    public Order(int id, Market market, OrderSide side, decimal price, decimal quantity)
+    public Order(int id, IMarket market, OrderSide side, decimal price, decimal quantity)
     {
       Id = id;
       Market = market;

@@ -4,18 +4,10 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-	<InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="ErrorHandling\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\PiTrade.Exchange\PiTrade.Exchange.csproj" />
     <ProjectReference Include="..\PiTrade.Networking\PiTrade.Networking.csproj" />
   </ItemGroup>
 
