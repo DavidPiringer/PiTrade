@@ -56,7 +56,7 @@ namespace PiTrade.Exchange
         WebSocketReceiveResult receiveResult;
         do
         {
-          receiveResult = await WebSocket.ReceiveAsync(buffer, token);
+          receiveResult = await WebSocket.ReceiveAsync(buffer, token); // TODO: timeout with token, timeout evtl. via polling a public service?
           if (receiveResult.MessageType != WebSocketMessageType.Close)
             outputStream.Write(buffer, 0, receiveResult.Count);
         } while (!receiveResult.EndOfMessage);

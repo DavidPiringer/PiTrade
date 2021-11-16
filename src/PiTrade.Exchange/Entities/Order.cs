@@ -27,6 +27,6 @@ namespace PiTrade.Exchange.Entities
 
     public void Fill(decimal quantity) => ExecutedQuantity += quantity;
 
-    public override string ToString() => $"Id = {Id}, Market = {Market}, Side = {Side}";
+    public override string ToString() => $"Id = {Id}, Market = {Market}, Side = {Side}, Price = {Price}, Quantity = {Quantity}, ExecutedQuantity = {ExecutedQuantity}, Amount = {Price * Quantity}";
   }
 }

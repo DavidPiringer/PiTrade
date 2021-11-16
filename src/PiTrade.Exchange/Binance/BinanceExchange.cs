@@ -1,15 +1,6 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Extensions;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web;
 
 
 namespace PiTrade.Exchange.Binance
@@ -18,9 +9,15 @@ namespace PiTrade.Exchange.Binance
   {
     private readonly BinanceHttpWrapper BinanceHttpWrapper;
 
-
     private IList<Order> activeOrders = new List<Order>();
-    public IEnumerable<Order> ActiveOrders => activeOrders;
+    public IEnumerable<Order> ActiveOrders { 
+      get { 
+        lock(locker)
+        {
+          return new List<Order>(activeOrders);
+        }
+      } 
+    }
     
 
     // TODO
@@ -76,7 +73,8 @@ namespace PiTrade.Exchange.Binance
     {
       await BinanceHttpWrapper.SendSigned("/api/v3/openOrders", HttpMethod.Delete, new Dictionary<string, object>()
       { {"symbol", market.ToString()} });
-      lock (locker)
+      lock (locker) // Cancel all of market
+        //activeOrders = ActiveOrders.Where(x => x.Market.ToString() == market.ToString()).ToList();
         activeOrders.Clear();
     }
       
@@ -120,8 +118,8 @@ namespace PiTrade.Exchange.Binance
         var priceFilter = symbolInfo["filters"]?.Where(x => x["filterType"]?.ToString() == "PRICE_FILTER").First();
         var lotSize = symbolInfo["filters"]?.Where(x => x["filterType"]?.ToString() == "LOT_SIZE").First();
       }*/
-      Console.WriteLine(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-      Console.WriteLine(response);
+      //Console.WriteLine(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+      //Console.WriteLine(response);
     }
 
     public async Task<IReadOnlyDictionary<string, decimal>> GetFunds()
