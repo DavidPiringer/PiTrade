@@ -33,8 +33,6 @@ namespace PiTrade.Exchange.Binance
     public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds()
     {
       var response = await SendSigned<AccountInformation>("/api/v3/account", HttpMethod.Get);
-
-
       Dictionary<Symbol, decimal> funds = new Dictionary<Symbol, decimal>();
       foreach (var balance in response.Balances ?? Enumerable.Empty<AccountBalanceInformation>())
         if (balance.Asset != null)
@@ -52,12 +50,12 @@ namespace PiTrade.Exchange.Binance
     private async Task InitExchange()
     {
       var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
-      ServerDeltaTime = response.ServerTime;
+      ServerDeltaTime = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       var markets = new List<IMarket>();
       foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>())
       {
-        if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null)
+        if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null && symbol.BaseAsset == "MANA" && symbol.QuoteAsset == "USDT")
         {
           var assetPrecision = symbol.Filters.Where(x => x.FilterType == "LOT_SIZE").Select(x => CalcPrecision(x.StepSize)).FirstOrDefault(-1);
           var quotePrecision = symbol.Filters.Where(x => x.FilterType == "PRICE_FILTER").Select(x => CalcPrecision(x.TickSize)).FirstOrDefault(-1);
@@ -85,8 +83,8 @@ namespace PiTrade.Exchange.Binance
         {"quantity", quantity},
         {"price", price}
       });
-      if (response == null || response.Id != -1)
-        throw new Exception($"Response contains no order id ({response})");
+      if (response == null || response.Id == -1)
+        throw new Exception($"Response contains no order id ({response?.Id})");
       return new Order(response.Id, market, side, price, quantity);
     }
 
@@ -120,8 +118,9 @@ namespace PiTrade.Exchange.Binance
     {
       if (input == null) return -1;
       var decimalSeparator = NumberFormatInfo.CurrentInfo.CurrencyDecimalSeparator;
-      var position = input.IndexOf(decimalSeparator);
-      return (position == -1) ? 0 : input.Length - position - 1;
+      var digits = input.Split(decimalSeparator).Last();
+      var position = digits.IndexOf("1");
+      return (position == -1) ? 0 : position + 1;
     }
 
     private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
@@ -165,7 +164,8 @@ namespace PiTrade.Exchange.Binance
         var response = await Client.SendAsync(request);
         var json = await response.Content.ReadAsStringAsync();
 #pragma warning disable CS8603 // Possible null reference return.
-        return JsonConvert.DeserializeObject<T>(json);
+        return typeof(T) != typeof(EmptyJsonResponse) ?
+               JsonConvert.DeserializeObject<T>(json) : default(T);
 #pragma warning restore CS8603 // Possible null reference return.
       }
     }
@@ -183,7 +183,7 @@ namespace PiTrade.Exchange.Binance
     {
       if (sign)
       {
-        query.Add("recvWindow", 5000);
+        query.Add("recvWindow", 20000);
         query.Add("timestamp", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ServerDeltaTime);
       }
 

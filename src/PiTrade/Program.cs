@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using PiTrade.Exchange;
 using PiTrade.Exchange.Binance;
 using PiTrade.Exchange.Entities;
+using PiTrade.Strategy;
 //using PiTrade.Strategy;
 
 var configPath = @"C:\Users\David\Documents\binanceConfig.json";
@@ -28,14 +29,11 @@ if (key == null || secret == null)
 
 var exchange = new BinanceExchange(key, secret);
 var markets = exchange.AvailableMarkets;
-var selectedMarket = exchange.GetMarket(Symbol.GALA, Symbol.USDT);
+var selectedMarket = exchange.GetMarket(Symbol.MANA, Symbol.USDT);
 if(selectedMarket != null)
 {
-  await selectedMarket.Listen(
-    o => Task.CompletedTask,
-    o => Task.CompletedTask,
-    p => Task.Run(() => Console.WriteLine(p)),
-    CancellationToken.None);
+  var strategy = new MovingAverageStrategy(selectedMarket);
+  await strategy.Run(CancellationToken.None);
 }
 
 //await exchange.AvailableMarkets.First().Listen(o => Task.CompletedTask, o => Task.CompletedTask, o => Task.CompletedTask, CancellationToken.None);

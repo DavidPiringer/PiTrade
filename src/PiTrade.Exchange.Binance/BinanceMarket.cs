@@ -56,6 +56,20 @@ namespace PiTrade.Exchange.Binance
       await WS.Disconnect();
     }
 
+
+    public async override Task Cancel(Order order)
+    {
+      await base.Cancel(order);
+      await Exchange.Cancel(order);
+    }
+
+    public async override Task CancelAll()
+    {
+      await base.CancelAll();
+      await Exchange.CancelAll(this);
+    }
+
+
     public override Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity) => 
       Exchange.NewOrder(this, side, price, quantity);
 
