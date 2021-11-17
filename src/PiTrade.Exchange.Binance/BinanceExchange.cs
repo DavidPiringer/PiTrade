@@ -15,8 +15,13 @@ namespace PiTrade.Exchange.Binance
     private const string BaseUri = "https://api.binance.com";
     private readonly string Secret;
     private readonly HttpClient Client;
+    private readonly object locker = new object();
 
-    private long ServerDeltaTime { get; set; }
+    private long serverDeltaTime;
+    private long ServerDeltaTime {
+      get { lock (locker) { return serverDeltaTime; } }
+      set { lock (locker) { serverDeltaTime = value; } }
+    }
 
     public IEnumerable<IMarket> AvailableMarkets { get; private set; } = Enumerable.Empty<IMarket>();
 
@@ -46,7 +51,6 @@ namespace PiTrade.Exchange.Binance
       AvailableMarkets.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
 
     #region Private Methods
-
     private async Task InitExchange()
     {
       var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
@@ -55,7 +59,7 @@ namespace PiTrade.Exchange.Binance
       var markets = new List<IMarket>();
       foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>())
       {
-        if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null && symbol.BaseAsset == "MANA" && symbol.QuoteAsset == "USDT")
+        if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null)
         {
           var assetPrecision = symbol.Filters.Where(x => x.FilterType == "LOT_SIZE").Select(x => CalcPrecision(x.StepSize)).FirstOrDefault(-1);
           var quotePrecision = symbol.Filters.Where(x => x.FilterType == "PRICE_FILTER").Select(x => CalcPrecision(x.TickSize)).FirstOrDefault(-1);
@@ -67,8 +71,16 @@ namespace PiTrade.Exchange.Binance
         }
       }
       AvailableMarkets = markets;
+      RefreshServerDeltaTime();
     }
 
+    private void RefreshServerDeltaTime() =>
+      Task.Delay(TimeSpan.FromMinutes(1))
+          .ContinueWith(t => Send<ExchangeInformation>("/api/v3/time", HttpMethod.Get)
+          .ContinueWith(r => {
+            ServerDeltaTime = r.Result.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            RefreshServerDeltaTime();
+          }));
     #endregion
 
     #region Internal Methods
@@ -99,19 +111,6 @@ namespace PiTrade.Exchange.Binance
         { {"symbol", MarketString(market)} });
 
     #endregion
-
-    //public async Task<Order> Get(int id)
-    //{
-    //  await Task.CompletedTask;
-    //  var order = ActiveOrders.Where(x => x.Id == id).FirstOrDefault();
-    //  if (order == null)
-    //    throw new Exception($"Order '{order}' is not active.");
-    //  return order;
-    //}
-
-
-
-
 
     #region Helper
     private static int CalcPrecision(string? input)
@@ -160,9 +159,15 @@ namespace PiTrade.Exchange.Binance
           request.Content = new StringContent(
             JsonConvert.SerializeObject(content),
             Encoding.UTF8, "application/json");
-
+       
         var response = await Client.SendAsync(request);
         var json = await response.Content.ReadAsStringAsync();
+        if(!response.IsSuccessStatusCode)
+        {
+          Console.WriteLine(response);
+          Console.WriteLine(json);
+        }
+          
 #pragma warning disable CS8603 // Possible null reference return.
         return typeof(T) != typeof(EmptyJsonResponse) ?
                JsonConvert.DeserializeObject<T>(json) : default(T);

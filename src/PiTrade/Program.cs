@@ -17,28 +17,11 @@ if (key == null || secret == null)
 
 
 
-//var market = new Market(Symbol.BNB, Symbol.EUR, 3, 1);
-//var market = new Market(Symbol.SHIB, Symbol.EUR, 0, 8);
-//var market = new Market(Symbol.WIN, Symbol.EUR, 0, 7);
-//var market = new Market(Symbol.SXP, Symbol.EUR, 1, 3);
-//var market = new Market(Symbol.PORTO, Symbol.EUR, 2, 4);
-//var market = new Market(Symbol.GALA, Symbol.USDT, 0, 5);
-//var market = new Market(Symbol.ADA, Symbol.EUR, 1, 3);
-
-//Console.WriteLine(OrderSide.BUY);
-
 var exchange = new BinanceExchange(key, secret);
 var markets = exchange.AvailableMarkets;
-var selectedMarket = exchange.GetMarket(Symbol.MANA, Symbol.USDT);
+var selectedMarket = exchange.GetMarket(Symbol.GALA, Symbol.USDT);
 if(selectedMarket != null)
 {
   var strategy = new MovingAverageStrategy(selectedMarket);
   await strategy.Run(CancellationToken.None);
 }
-
-//await exchange.AvailableMarkets.First().Listen(o => Task.CompletedTask, o => Task.CompletedTask, o => Task.CompletedTask, CancellationToken.None);
-
-//await exchange.GetExchangeInformation(market);
-
-//var strategy = new MovingAverageStrategy(exchange, market);
-//await strategy.Run(CancellationToken.None);

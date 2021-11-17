@@ -27,7 +27,7 @@ namespace PiTrade.Exchange.Binance
 
     public override async Task Listen(Func<Order, Task> onBuy, Func<Order, Task> onSell, Func<decimal, Task> onPriceUpdate, CancellationToken token)
     {
-      await WS.Connect(Uri);
+      await WS.Connect(Uri); // TODO: intern event handlers to handle multiple listen calls
       await await Task.Factory.StartNew(async () => {
         while (!token.IsCancellationRequested)
         {

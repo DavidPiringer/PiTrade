@@ -20,6 +20,8 @@ namespace PiTrade.Exchange.Entities
     public static Symbol GALA => new Symbol("GALA");
     public static Symbol DOGE => new Symbol("DOGE");
     public static Symbol MANA => new Symbol("MANA");
+    public static Symbol SAND => new Symbol("SAND");
+    public static Symbol STRAX => new Symbol("STRAX");
     public static Symbol EUR => new Symbol("EUR");
     public static Symbol USDT => new Symbol("USDT");
 

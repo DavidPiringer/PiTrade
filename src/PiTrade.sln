@@ -9,9 +9,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PiTrade.Exchange", "PiTrade
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PiTrade.Strategy", "PiTrade.Strategy\PiTrade.Strategy.csproj", "{745E1A66-B1C2-4BAC-96C4-CABCB7B444DC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PiTrade.Exchange.Binance", "PiTrade.Exchange.Binance\PiTrade.Exchange.Binance.csproj", "{8EA79FBB-B260-4F85-80C9-DE1A2052032F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PiTrade.Exchange.Binance", "PiTrade.Exchange.Binance\PiTrade.Exchange.Binance.csproj", "{8EA79FBB-B260-4F85-80C9-DE1A2052032F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PiTrade.Networking", "PiTrade.Networking\PiTrade.Networking.csproj", "{64778DAA-64B7-4BDF-82E0-029966248056}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PiTrade.Networking", "PiTrade.Networking\PiTrade.Networking.csproj", "{64778DAA-64B7-4BDF-82E0-029966248056}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PiTrade.Logging", "PiTrade.Logging\PiTrade.Logging.csproj", "{0859CC2D-26D2-4B3F-A0F5-D15F9E27B425}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{64778DAA-64B7-4BDF-82E0-029966248056}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{64778DAA-64B7-4BDF-82E0-029966248056}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{64778DAA-64B7-4BDF-82E0-029966248056}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0859CC2D-26D2-4B3F-A0F5-D15F9E27B425}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0859CC2D-26D2-4B3F-A0F5-D15F9E27B425}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0859CC2D-26D2-4B3F-A0F5-D15F9E27B425}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0859CC2D-26D2-4B3F-A0F5-D15F9E27B425}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
