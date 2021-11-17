@@ -4,10 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Exchange.Entities
-{
-  public class Order
-  {
+namespace PiTrade.Exchange.Entities {
+  public class Order {
     public int Id { get; private set; }
     public IMarket Market { get; private set; }
     public OrderSide Side { get; private set; }
@@ -16,8 +14,7 @@ namespace PiTrade.Exchange.Entities
     public decimal ExecutedQuantity { get; private set; } = 0;
     public bool IsFilled => Quantity <= ExecutedQuantity;
 
-    public Order(int id, IMarket market, OrderSide side, decimal price, decimal quantity)
-    {
+    public Order(int id, IMarket market, OrderSide side, decimal price, decimal quantity) {
       Id = id;
       Market = market;
       Side = side;

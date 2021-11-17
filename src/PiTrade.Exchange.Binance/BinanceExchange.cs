@@ -8,10 +8,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Web;
 
-namespace PiTrade.Exchange.Binance
-{
-  public sealed class BinanceExchange : IExchange
-  {
+namespace PiTrade.Exchange.Binance {
+  public sealed class BinanceExchange : IExchange {
     private const string BaseUri = "https://api.binance.com";
     private readonly string Secret;
     private readonly HttpClient Client;
@@ -25,8 +23,7 @@ namespace PiTrade.Exchange.Binance
 
     public IEnumerable<IMarket> AvailableMarkets { get; private set; } = Enumerable.Empty<IMarket>();
 
-    public BinanceExchange(string key, string secret)
-    {
+    public BinanceExchange(string key, string secret) {
       Secret = secret;
       Client = new HttpClient();
       Client.BaseAddress = new Uri(BaseUri);
@@ -35,8 +32,7 @@ namespace PiTrade.Exchange.Binance
       InitExchange().Wait();
     }
 
-    public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds()
-    {
+    public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds() {
       var response = await SendSigned<AccountInformation>("/api/v3/account", HttpMethod.Get);
       Dictionary<Symbol, decimal> funds = new Dictionary<Symbol, decimal>();
       foreach (var balance in response.Balances ?? Enumerable.Empty<AccountBalanceInformation>())
@@ -47,20 +43,17 @@ namespace PiTrade.Exchange.Binance
     }
 
 
-    public IMarket? GetMarket(Symbol asset, Symbol quote) => 
+    public IMarket? GetMarket(Symbol asset, Symbol quote) =>
       AvailableMarkets.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
 
     #region Private Methods
-    private async Task InitExchange()
-    {
+    private async Task InitExchange() {
       var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
       ServerDeltaTime = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       var markets = new List<IMarket>();
-      foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>())
-      {
-        if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null)
-        {
+      foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>()) {
+        if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null) {
           var assetPrecision = symbol.Filters.Where(x => x.FilterType == "LOT_SIZE").Select(x => CalcPrecision(x.StepSize)).FirstOrDefault(-1);
           var quotePrecision = symbol.Filters.Where(x => x.FilterType == "PRICE_FILTER").Select(x => CalcPrecision(x.TickSize)).FirstOrDefault(-1);
           if (assetPrecision != -1 && quotePrecision != -1)
@@ -84,8 +77,7 @@ namespace PiTrade.Exchange.Binance
     #endregion
 
     #region Internal Methods
-    internal async Task<Order> NewOrder(IMarket market, OrderSide side, decimal price, decimal quantity)
-    {
+    internal async Task<Order> NewOrder(IMarket market, OrderSide side, decimal price, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -113,8 +105,7 @@ namespace PiTrade.Exchange.Binance
     #endregion
 
     #region Helper
-    private static int CalcPrecision(string? input)
-    {
+    private static int CalcPrecision(string? input) {
       if (input == null) return -1;
       var decimalSeparator = NumberFormatInfo.CurrentInfo.CurrencyDecimalSeparator;
       var digits = input.Split(decimalSeparator).Last();
@@ -130,8 +121,7 @@ namespace PiTrade.Exchange.Binance
     private Task<EmptyJsonResponse> Send(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
       Send<EmptyJsonResponse>(requestUri, method, query, content);
 
-    private async Task<T> Send<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null)
-    {
+    private async Task<T> Send<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
       if (query == null)
         query = new Dictionary<string, object>();
 
@@ -142,8 +132,7 @@ namespace PiTrade.Exchange.Binance
     private Task<EmptyJsonResponse> SendSigned(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
       SendSigned<EmptyJsonResponse>(requestUri, method, query, content);
 
-    private async Task<T> SendSigned<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null)
-    {
+    private async Task<T> SendSigned<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
       if (query == null)
         query = new Dictionary<string, object>();
 
@@ -151,23 +140,20 @@ namespace PiTrade.Exchange.Binance
       return await SendRequest<T>($"{requestUri}?{queryString}", method, content);
     }
 
-    private async Task<T> SendRequest<T>(string requestUri, HttpMethod method, object? content)
-    {
-      using (var request = new HttpRequestMessage(method, $"{BaseUri}{requestUri}"))
-      {
+    private async Task<T> SendRequest<T>(string requestUri, HttpMethod method, object? content) {
+      using (var request = new HttpRequestMessage(method, $"{BaseUri}{requestUri}")) {
         if (content != null)
           request.Content = new StringContent(
             JsonConvert.SerializeObject(content),
             Encoding.UTF8, "application/json");
-       
+
         var response = await Client.SendAsync(request);
         var json = await response.Content.ReadAsStringAsync();
-        if(!response.IsSuccessStatusCode)
-        {
+        if (!response.IsSuccessStatusCode) {
           Console.WriteLine(response);
           Console.WriteLine(json);
         }
-          
+
 #pragma warning disable CS8603 // Possible null reference return.
         return typeof(T) != typeof(EmptyJsonResponse) ?
                JsonConvert.DeserializeObject<T>(json) : default(T);
@@ -175,19 +161,15 @@ namespace PiTrade.Exchange.Binance
       }
     }
 
-    private string Sign(string rawData)
-    {
-      using (HMACSHA256 sha256Hash = new HMACSHA256(Encoding.UTF8.GetBytes(Secret)))
-      {
+    private string Sign(string rawData) {
+      using (HMACSHA256 sha256Hash = new HMACSHA256(Encoding.UTF8.GetBytes(Secret))) {
         byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
         return BitConverter.ToString(bytes).Replace("-", "").ToLower();
       }
     }
 
-    private string PrepareQueryString(IDictionary<string, object> query, bool sign = true)
-    {
-      if (sign)
-      {
+    private string PrepareQueryString(IDictionary<string, object> query, bool sign = true) {
+      if (sign) {
         query.Add("recvWindow", 20000);
         query.Add("timestamp", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ServerDeltaTime);
       }

@@ -4,10 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Exchange.Entities
-{
-  public class Symbol
-  {
+namespace PiTrade.Exchange.Entities {
+  public class Symbol {
     // TODO: add static editable symbol cache
     public static Symbol BTC => new Symbol("BTC");
     public static Symbol ETC => new Symbol("ETC");
@@ -27,8 +25,7 @@ namespace PiTrade.Exchange.Entities
 
     private string Value { get; set; }
 
-    public Symbol(string symbol)
-    {
+    public Symbol(string symbol) {
       Value = symbol;
     }
 

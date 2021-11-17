@@ -1,5 +1,6 @@
 ﻿using PiTrade.Exchange;
 using PiTrade.Exchange.Entities;
+using PiTrade.Logging;
 using PiTrade.Strategy.Domain;
 using PiTrade.Strategy.Util;
 using System;
@@ -8,10 +9,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Strategy
-{
-  public class MovingAverageStrategy
-  {
+namespace PiTrade.Strategy {
+  public class MovingAverageStrategy {
     #region Properties
     private readonly IMarket Market;
 
@@ -25,46 +24,39 @@ namespace PiTrade.Strategy
     private decimal QuoteAvailable { get; set; }
     private decimal Profit { get; set; } = 0m;
     private long TradeCount { get; set; } = 0;
+
+    public decimal MaxQuote { get; }
+    public decimal MinQuote { get; }
+    public int MaxOrderCount => (int)(MaxQuote / MinQuote);
     #endregion
 
     #region Constructors
-    public MovingAverageStrategy(IMarket market)
-    {
+    public MovingAverageStrategy(IMarket market, decimal maxQuote, decimal minQuote) {
       Market = market;
+      MaxQuote = maxQuote;
+      MinQuote = minQuote;
     }
     #endregion
 
-    public async Task Run(CancellationToken token)
-    {
-      try
-      {
+    public async Task Run(CancellationToken token) {
+      try {
         RestartTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         await UpdateStats();
-        await Market.Listen(OnBuy, OnSell, OnPriceUpdate, CancellationToken.None);
-      }
-      catch (Exception ex)
-      {
+        await Market.Listen(OnBuy, OnSell, OnPriceUpdate, token);
+      } catch (Exception ex) {
         var orders = Market.ActiveOrders;
         foreach (var o in orders)
-          Console.WriteLine($"FILLED = {o}");
-
-        Console.WriteLine("############## ERROR ################");
-        Console.WriteLine(ex.Message);
-        Console.WriteLine("#####################################");
-      }
-      finally
-      {
-        foreach (var order in Market.ActiveOrders.Where(x => x.Side == OrderSide.BUY && !x.IsFilled))
-        {
+          Log.Info(o);
+        Log.Error(ex.Message);
+      } finally {
+        foreach (var order in Market.ActiveOrders.Where(x => x.Side == OrderSide.BUY && !x.IsFilled)) {
           await Market.Cancel(order);
         }
       }
     }
 
-    private async Task OnPriceUpdate(decimal price)
-    {
-      if (!IsTrading && (RestartTime + 2) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds())
-      {
+    private async Task OnPriceUpdate(decimal price) {
+      if (!IsTrading && (RestartTime + 2) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
         // TODO: nur kleine intervalle bis stop -> bei stop sofort verkaufen?
         // init
         IsTrading = true;
@@ -86,20 +78,17 @@ namespace PiTrade.Strategy
         foreach (var step in orderedSteps)
           BuySteps.Enqueue(step);
         await NextBuyStep();
-      }
-      else if (IsTrading
-        && SellOrder == null
-        && !Market.ActiveOrders.Any(x => x.ExecutedQuantity > 0)
-        && (TradeStart + 10) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-        && CurBuyOrder != null
-        && CurBuyOrder.Price <= (price * 0.99m))
-      {
+      } else if (IsTrading
+          && SellOrder == null
+          && !Market.ActiveOrders.Any(x => x.ExecutedQuantity > 0)
+          && (TradeStart + 10) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+          && CurBuyOrder != null
+          && CurBuyOrder.Price <= (price * 0.99m)) {
         await Restart();
       }
     }
 
-    private async Task OnBuy(Order order)
-    {
+    private async Task OnBuy(Order order) {
       if (!order.IsFilled) return;
 
       var orders = Market.ActiveOrders;
@@ -129,19 +118,16 @@ namespace PiTrade.Strategy
       await NextBuyStep();
     }
 
-    private async Task OnSell(Order order)
-    {
+    private async Task OnSell(Order order) {
       if (!order.IsFilled) return;
       await Restart();
       await UpdateStats();
     }
 
-    private IEnumerable<BuyStep> SetupBuyOrders(decimal price, IEnumerable<decimal> steps, decimal start, decimal power)
-    {
+    private IEnumerable<BuyStep> SetupBuyOrders(decimal price, IEnumerable<decimal> steps, decimal start, decimal power) {
       decimal pot = 1.0m;
       IList<BuyStep> stepList = new List<BuyStep>();
-      foreach (var step in steps)
-      {
+      foreach (var step in steps) {
         var priceStep = step * price;
         var quantity = (start * pot) / priceStep;
         pot *= power;
@@ -150,21 +136,17 @@ namespace PiTrade.Strategy
       return stepList;
     }
 
-    private async Task NextBuyStep()
-    {
-      if (BuySteps.Count > 0)
-      {
+    private async Task NextBuyStep() {
+      if (BuySteps.Count > 0) {
         var firstStep = BuySteps.Dequeue();
         CurBuyOrder = await Market.Buy(firstStep.Price, firstStep.Quantity);
       }
     }
 
-    private async Task<IEnumerable<decimal>> GetFunds(params Symbol[] symbols)
-    {
+    private async Task<IEnumerable<decimal>> GetFunds(params Symbol[] symbols) {
       var dict = await Market.Exchange.GetFunds();
       IList<decimal> funds = new List<decimal>();
-      foreach (var symbol in symbols)
-      {
+      foreach (var symbol in symbols) {
         decimal fund;
         dict.TryGetValue(symbol, out fund);
         funds.Add(fund);
@@ -172,8 +154,7 @@ namespace PiTrade.Strategy
       return funds;
     }
 
-    private async Task Restart()
-    {
+    private async Task Restart() {
       Console.WriteLine("############ RESTART ############");
       await Market.CancelAll();
       IsTrading = false;
@@ -184,8 +165,7 @@ namespace PiTrade.Strategy
       RestartTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 
-    private async Task UpdateStats()
-    {
+    private async Task UpdateStats() {
       var funds = await GetFunds(Market.Asset, Market.Quote);
       if (funds.Count() != 2)
         throw new Exception("At least one symbol in market is not available.");

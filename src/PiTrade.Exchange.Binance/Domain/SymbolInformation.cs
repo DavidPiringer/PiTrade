@@ -5,13 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Exchange.Binance.Domain
-{
+namespace PiTrade.Exchange.Binance.Domain {
   // example: https://api.binance.com/api/v3/exchangeInfo?symbol=GALAUSDT
 
   [JsonObject(MemberSerialization.OptIn)]
-  internal class SymbolInformation
-  {
+  internal class SymbolInformation {
     [JsonProperty(PropertyName = "symbol")]
     public string? MarketString { get; set; }
 

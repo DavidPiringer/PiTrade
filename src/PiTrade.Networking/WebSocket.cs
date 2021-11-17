@@ -5,34 +5,29 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Networking
-{
-  public class WebSocket
-  {
+namespace PiTrade.Networking {
+  public class WebSocket {
     private static readonly int ReceiveBufferSize = 8192;
 
     private readonly ClientWebSocket WS = new ClientWebSocket();
     private readonly CancellationTokenSource CTS = new CancellationTokenSource();
-    
+
+    public bool IsConnected { get; private set; } = false;
 
 
-    public WebSocket()
-    { }
+    public WebSocket() { }
 
 
-    public async Task<string> NextMessage()
-    {
+    public async Task<string> NextMessage() {
       if (WS.State != WebSocketState.Open)
         throw new InvalidOperationException("WebSocket is not connected. Call Connect(Uri) before.");
 
       var token = CTS.Token;
       var buffer = new byte[ReceiveBufferSize];
       string msg = "";
-      using (MemoryStream outputStream = new MemoryStream(ReceiveBufferSize))
-      {
+      using (MemoryStream outputStream = new MemoryStream(ReceiveBufferSize)) {
         WebSocketReceiveResult receiveResult;
-        do
-        {
+        do {
           receiveResult = await WS.ReceiveAsync(buffer, token);
           if (receiveResult.MessageType != WebSocketMessageType.Close)
             outputStream.Write(buffer, 0, receiveResult.Count);
@@ -49,12 +44,14 @@ namespace PiTrade.Networking
      * TODO: SendMessage()
      */
 
-    public async Task Connect(Uri connectionUri) => await WS.ConnectAsync(connectionUri, CTS.Token);
+    public async Task Connect(Uri connectionUri) {
+      IsConnected = true;
+      await WS.ConnectAsync(connectionUri, CTS.Token);
+    }
 
-    public async Task Disconnect()
-    {
-      if (WS.State == WebSocketState.Open)
-      {
+    public async Task Disconnect() {
+      IsConnected = false;
+      if (WS.State == WebSocketState.Open) {
         CTS.CancelAfter(TimeSpan.FromSeconds(2));
         await WS.CloseOutputAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
         await WS.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
@@ -65,12 +62,9 @@ namespace PiTrade.Networking
 
     #region Dispose
     private bool disposedValue;
-    protected virtual void Dispose(bool disposing)
-    {
-      if (!disposedValue)
-      {
-        if (disposing)
-        {
+    protected virtual void Dispose(bool disposing) {
+      if (!disposedValue) {
+        if (disposing) {
           Disconnect().Wait();
         }
 
@@ -87,8 +81,7 @@ namespace PiTrade.Networking
     //     Dispose(disposing: false);
     // }
 
-    public void Dispose()
-    {
+    public void Dispose() {
       // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
       Dispose(disposing: true);
       GC.SuppressFinalize(this);

@@ -5,10 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange.Entities;
 
-namespace PiTrade.Exchange
-{
-  public interface IExchange
-  {
+namespace PiTrade.Exchange {
+  public interface IExchange {
     IEnumerable<IMarket> AvailableMarkets { get; }
     IMarket? GetMarket(Symbol asset, Symbol quote);
     Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds();

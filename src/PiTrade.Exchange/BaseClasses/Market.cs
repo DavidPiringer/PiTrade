@@ -4,10 +4,8 @@ using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Networking;
 
-namespace PiTrade.Exchange.BasesClasses
-{
-  public abstract class Market : IMarket
-  {
+namespace PiTrade.Exchange.BasesClasses {
+  public abstract class Market : IMarket {
     public IExchange Exchange { get; }
     public Symbol Asset { get; }
     public Symbol Quote { get; }
@@ -19,8 +17,7 @@ namespace PiTrade.Exchange.BasesClasses
     public IEnumerable<Order> ActiveOrders => orders.Values;
 
 
-    public Market(IExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision)
-    {
+    public Market(IExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision) {
       Exchange = exchange;
       Asset = asset;
       Quote = quote;
@@ -29,8 +26,7 @@ namespace PiTrade.Exchange.BasesClasses
     }
 
 
-    public async Task<Order> Buy(decimal price, decimal quantity)
-    {
+    public async Task<Order> Buy(decimal price, decimal quantity) {
       var order = await NewOrder(OrderSide.BUY,
         price.RoundDown(QuotePrecision),
         quantity.RoundUp(AssetPrecision));
@@ -38,9 +34,8 @@ namespace PiTrade.Exchange.BasesClasses
       return order;
     }
 
-    public async Task<Order> Sell(decimal price, decimal quantity)
-    {
-      var order = await NewOrder(OrderSide.SELL, 
+    public async Task<Order> Sell(decimal price, decimal quantity) {
+      var order = await NewOrder(OrderSide.SELL,
         price.RoundUp(QuotePrecision),
         quantity.RoundDown(AssetPrecision));
       orders.TryAdd(order.Id, order);
@@ -52,7 +47,7 @@ namespace PiTrade.Exchange.BasesClasses
 
     public virtual async Task CancelAll() =>
       await Task.Run(() => orders.Clear());
-    
+
 
     public abstract Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity);
     public abstract Task Listen(Func<Order, Task> onBuy, Func<Order, Task> onSell, Func<decimal, Task> onPriceUpdate, CancellationToken token);

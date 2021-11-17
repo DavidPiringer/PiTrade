@@ -6,10 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Exchange
-{
-  public interface IMarket
-  {
+namespace PiTrade.Exchange {
+  public interface IMarket {
     IExchange Exchange { get; }
     Symbol Asset { get; }
     Symbol Quote { get; }
@@ -21,7 +19,7 @@ namespace PiTrade.Exchange
     Task Cancel(Order order);
     Task CancelAll();
     Task Listen(
-      Func<Order, Task> onBuy, 
+      Func<Order, Task> onBuy,
       Func<Order, Task> onSell,
       Func<decimal, Task> onPriceUpdate,
       CancellationToken token);
