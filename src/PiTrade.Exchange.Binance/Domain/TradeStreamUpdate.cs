@@ -15,9 +15,9 @@ namespace PiTrade.Exchange.Binance.Domain {
     public decimal Quantity { get; set; }
 
     [JsonProperty(PropertyName = "b")]
-    public int OIDBuyer { get; set; }
+    public long OIDBuyer { get; set; }
 
     [JsonProperty(PropertyName = "a")]
-    public int OIDSeller { get; set; }
+    public long OIDSeller { get; set; }
   }
 }

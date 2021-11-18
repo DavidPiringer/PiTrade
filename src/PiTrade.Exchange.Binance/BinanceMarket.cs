@@ -53,7 +53,7 @@ namespace PiTrade.Exchange.Binance {
       Exchange.NewOrder(this, side, price, quantity);
 
     private async Task Run(CancellationToken token) {
-      await Task.Factory.StartNew(async () => {
+      await await Task.Factory.StartNew(async () => {
         await WS.Connect(Uri);
         while (!token.IsCancellationRequested) {
           var msg = await WS.NextMessage();

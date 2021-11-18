@@ -13,7 +13,7 @@ namespace PiTrade.Exchange.BasesClasses {
     public int QuotePrecision { get; }
 
 
-    private ConcurrentDictionary<int, Order> orders = new ConcurrentDictionary<int, Order>();
+    private ConcurrentDictionary<long, Order> orders = new ConcurrentDictionary<long, Order>();
     public IEnumerable<Order> ActiveOrders => orders.Values;
 
 

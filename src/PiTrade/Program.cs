@@ -19,8 +19,8 @@ if (key == null || secret == null)
 
 var exchange = new BinanceExchange(key, secret);
 var markets = exchange.AvailableMarkets;
-var selectedMarket = exchange.GetMarket(Symbol.GALA, Symbol.USDT);
+var selectedMarket = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
 if (selectedMarket != null) {
-  var strategy = new MovingAverageStrategy(selectedMarket);
+  var strategy = new MovingAverageStrategy(selectedMarket, 500m, 12.5m, 0.9m);
   await strategy.Run(CancellationToken.None);
 }

@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using PiTrade.Exchange.Binance.Domain;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Extensions;
+using PiTrade.Logging;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -150,8 +151,8 @@ namespace PiTrade.Exchange.Binance {
         var response = await Client.SendAsync(request);
         var json = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode) {
-          Console.WriteLine(response);
-          Console.WriteLine(json);
+          Log.Error(response);
+          Log.Error(json);
         }
 
 #pragma warning disable CS8603 // Possible null reference return.

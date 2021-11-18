@@ -1,5 +1,4 @@
-﻿using PiTrade.Exchange.Delegates;
-using PiTrade.Exchange.Entities;
+﻿using PiTrade.Exchange.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
