@@ -1,5 +1,6 @@
 ﻿using PiTrade.Exchange;
 using PiTrade.Exchange.Entities;
+using PiTrade.Exchange.Enums;
 using PiTrade.Logging;
 using PiTrade.Strategy.Domain;
 using PiTrade.Strategy.Util;
@@ -15,11 +16,12 @@ namespace PiTrade.Strategy {
     private readonly IMarket Market;
     private readonly decimal CommissionFee = 0.00075m;
     private readonly decimal AvgMultiplier = 1.002125m;
+    private readonly int RestartDelay = 2;
 
 
     private decimal MaxQuote { get; set; }
-    public decimal MinQuote { get; }
-    public int MaxOrderCount => (int)(MaxQuote / MinQuote);
+    public decimal BuyStepSize { get; }
+    public int MaxOrderCount => (int)(MaxQuote / BuyStepSize);
     public decimal OrdersUntilBelowBasePrice { get; }
 
 
@@ -38,10 +40,10 @@ namespace PiTrade.Strategy {
     #endregion
 
     #region Constructors
-    public MovingAverageStrategy(IMarket market, decimal maxQuote, decimal minQuote, decimal ordersUntilBelowBasePrice) {
+    public MovingAverageStrategy(IMarket market, decimal maxQuote, decimal buyStepSize, decimal ordersUntilBelowBasePrice) {
       Market = market;
       MaxQuote = maxQuote;
-      MinQuote = minQuote;
+      BuyStepSize = buyStepSize;
       OrdersUntilBelowBasePrice = ordersUntilBelowBasePrice;
     }
     #endregion
@@ -63,10 +65,9 @@ namespace PiTrade.Strategy {
     }
 
     private async Task OnPriceUpdate(decimal price) {
-      if (!IsTrading && (RestartTime + 2) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
+      if (!IsTrading && (RestartTime + RestartDelay) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
         // TODO: nur kleine intervalle bis stop -> bei stop sofort verkaufen?
         await SetupTrade(price);
-
       } else if (IsTrading
           && SellOrder == null
           && !Market.ActiveOrders.Any(x => x.ExecutedQuantity > 0)
@@ -79,9 +80,10 @@ namespace PiTrade.Strategy {
 
     private async Task OnBuy(Order order) {
       var lastFill = order.Fills.LastOrDefault();
-      Quantity += lastFill;
+      Quantity += lastFill; /* TODO: add later if BNB is depleted - lastFill * CommissionFee;*/
       Commission += lastFill * order.Price * CommissionFee;
       CurrentAmount += lastFill * order.Price;
+      Revenue -= lastFill * order.Price;
 
       // calc sellPrice and update sell order
       var avg = ExecutedOrders.Sum(x => AvgOrderWeight(x));
@@ -105,7 +107,6 @@ namespace PiTrade.Strategy {
         await Clear();
         PrintStats();
       }
-
     }
 
     private async Task SetupTrade(decimal basePrice) {
@@ -115,12 +116,12 @@ namespace PiTrade.Strategy {
       // setup buy order steps
       var steps = CalcBuySteps(basePrice,
         NumSpace.Linear(1.0m, OrdersUntilBelowBasePrice, MaxOrderCount),
-        MinQuote)
+        BuyStepSize)
         .OrderByDescending(x => x.Price);
 
       // calculate sum of all orders and check if the strategy is feasible
       var amountSum = steps.Sum(x => x.Amount);
-      if (MaxQuote < amountSum)
+      if (MaxQuote <= amountSum)
         throw new Exception($"Cannot setup Strategy because of insufficient funds (Available = {MaxQuote}, Necessary = {amountSum}[{Market.Quote}])");
 
       // enqueue steps and start with first
@@ -181,9 +182,9 @@ namespace PiTrade.Strategy {
       Log.Info("CLEAR");
     }
 
-    private void PrintStats() {
+    private void PrintStats() { // TODO: thread safe static class for profits
       Log.Info($"Revenue = {Revenue}");
-      Log.Info($"Revenue = {Commission}");
+      Log.Info($"Commission = {Commission}");
       Log.Info($"Profit = {Profit}");
     }
   }

@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
-using PiTrade.Exchange.BasesClasses;
 using PiTrade.Exchange.Binance.Domain;
 using PiTrade.Exchange.Entities;
+using PiTrade.Exchange.Enums;
 using PiTrade.Networking;
 using System;
 using System.Collections.Concurrent;

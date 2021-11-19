@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using PiTrade.Exchange.Entities;
+using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Networking;
 
-namespace PiTrade.Exchange.BasesClasses {
+namespace PiTrade.Exchange {
   public abstract class Market : IMarket {
     public IExchange Exchange { get; }
     public Symbol Asset { get; }
@@ -12,7 +13,7 @@ namespace PiTrade.Exchange.BasesClasses {
     public int AssetPrecision { get; }
     public int QuotePrecision { get; }
 
-
+    //TODO: listen -> return MarketHandle, add indicators (MA50, ..)
     private ConcurrentDictionary<long, Order> orders = new ConcurrentDictionary<long, Order>();
     public IEnumerable<Order> ActiveOrders => orders.Values;
 

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PiTrade.Exchange.Entities {
+namespace PiTrade.Exchange.Enums {
   public enum OrderSide {
     BUY = 0, SELL = 1
   }

@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using PiTrade.Exchange.Binance.Domain;
 using PiTrade.Exchange.Entities;
+using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Logging;
 using System.Globalization;

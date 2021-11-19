@@ -4,7 +4,6 @@ using PiTrade.Exchange;
 using PiTrade.Exchange.Binance;
 using PiTrade.Exchange.Entities;
 using PiTrade.Strategy;
-//using PiTrade.Strategy;
 
 var configPath = @"C:\Users\David\Documents\binanceConfig.json";
 var config = JObject.Parse(File.ReadAllText(configPath));
@@ -19,8 +18,8 @@ if (key == null || secret == null)
 
 var exchange = new BinanceExchange(key, secret);
 var markets = exchange.AvailableMarkets;
-var selectedMarket = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
+var selectedMarket = exchange.GetMarket(Symbol.SAND, Symbol.USDT);
 if (selectedMarket != null) {
-  var strategy = new MovingAverageStrategy(selectedMarket, 500m, 12.5m, 0.9m);
+  var strategy = new MovingAverageStrategy(selectedMarket, 605m, 15m, 0.9m);
   await strategy.Run(CancellationToken.None);
 }
