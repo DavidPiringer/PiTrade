@@ -1,4 +1,5 @@
 ﻿using PiTrade.Exchange.Entities;
+using PiTrade.Exchange.Indicators;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,12 +8,16 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange {
   public interface IMarket {
+    decimal CurrentPrice { get; }
     IExchange Exchange { get; }
     Symbol Asset { get; }
     Symbol Quote { get; }
     int AssetPrecision { get; }
     int QuotePrecision { get; }
     IEnumerable<Order> ActiveOrders { get; }
+    IEnumerable<IIndicator> Indicators { get; }
+
+    void AddIndicator(IIndicator indicator);
     Task<Order> Buy(decimal price, decimal quantity);
     Task<Order> Sell(decimal price, decimal quantity);
     Task Cancel(Order order);

@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PiTrade.Logging\PiTrade.Logging.csproj" />
     <ProjectReference Include="..\PiTrade.Networking\PiTrade.Networking.csproj" />
   </ItemGroup>
 

@@ -178,14 +178,15 @@ namespace PiTrade.Strategy {
       CurBuyOrder = null;
       Quantity = 0m;
       CurrentAmount = 0m;
+      ProfitCalculator.Add(Profit);
+      Revenue = 0m;
+      Commission = 0m;
       RestartTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
       Log.Info("CLEAR");
     }
 
     private void PrintStats() { // TODO: thread safe static class for profits
-      Log.Info($"Revenue = {Revenue}");
-      Log.Info($"Commission = {Commission}");
-      Log.Info($"Profit = {Profit}");
+      ProfitCalculator.PrintStats();
     }
   }
 }

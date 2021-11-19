@@ -60,6 +60,8 @@ namespace PiTrade.Exchange.Binance {
           var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
           if (update == null) continue;
 
+          CurrentPrice = update.Price;
+          await (PriceUpdate?.Invoke(update.Price) ?? Task.CompletedTask);
           var triggeredOrder = ActiveOrders.Where(x => x.Id == update.OIDBuyer || x.Id == update.OIDSeller).FirstOrDefault();
           if (triggeredOrder != null) {
             triggeredOrder.Fill(update.Quantity);
@@ -72,7 +74,6 @@ namespace PiTrade.Exchange.Binance {
                 break;
             }
           }
-          await (PriceUpdate?.Invoke(update.Price) ?? Task.CompletedTask);
         }
         await WS.Disconnect();
       }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);

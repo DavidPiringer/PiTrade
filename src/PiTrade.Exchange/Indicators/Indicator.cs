@@ -3,61 +3,53 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
+using PiTrade.Logging;
 
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
-    protected readonly TimeSpan Period;
     protected readonly IndicatorValueType ValueType;
     protected readonly int MaxTicks;
-    protected readonly decimal[] PeriodTicks;
+    protected readonly PriceCandle[] PeriodTicks;
 
-    private DateTime LastTick { get; set; } = DateTime.Now;
-    private IList<decimal> InPeriodTicks { get; } = new List<decimal>();
     private int First { get; set; } = 0;
     private int Last { get; set; } = 0;
-    private bool IsFull => ((Last + 1) % MaxTicks) == First;
+    private bool IsEmpty => First == Last;
+    public bool IsReady => ((Last + 1) % MaxTicks) == First;
+    public TimeSpan Period { get; private set; }    
+    public decimal Value { get; private set; }
 
-    public IEnumerable<decimal> Values {
-      get {
-        for(int i = First; i <= Last; i = (i + 1) % MaxTicks)
-          yield return PeriodTicks[i];
-      }
-    }
-
-    public Indicator(TimeSpan period, IndicatorValueType indicatorValueType = IndicatorValueType.Average, int maxTicks = 100) {
+    public Indicator(TimeSpan period, IndicatorValueType indicatorValueType = IndicatorValueType.Close, int maxTicks = 100) {
       Period = period;
       ValueType = indicatorValueType;
       MaxTicks = maxTicks;
-      PeriodTicks = new decimal[MaxTicks];
+      PeriodTicks = new PriceCandle[MaxTicks];
     }
 
-    public decimal Update(decimal value) { // ICandle
-      if (LastTick.Add(Period).CompareTo(DateTime.Now) > 0) {
-        // new Tick has started
-        // buffer updated indexes to prevent wrong Value array (for Calculate method)
-        var firstTmp = IsFull ? (First + 1) % MaxTicks : First;
-        var lastTmp = (Last + 1) % MaxTicks;
-        PeriodTicks[lastTmp] = Calculate(Aggregate(), PeriodTicks[Last]);
-        First = firstTmp; 
-        Last = lastTmp;
-        InPeriodTicks.Clear();
+    public void Update(PriceCandle candle) {
+      if(candle.Period.CompareTo(Period) == 0) {
+        First = IsReady ? (First + 1) % MaxTicks : First;
+        Last = (Last + 1) % MaxTicks;
+        PeriodTicks[Last] = candle;
+          Value = IsReady ? 
+            Calculate(Aggregate(candle), Value) : 
+            PeriodTicks.Where(x => x != null).Average(x => Aggregate(x));
+      } else {
+        Log.Error($"Candle has not the same period as referenced ticker.");
       }
-      InPeriodTicks.Add(value);
-      LastTick = DateTime.Now;
-      return PeriodTicks[Last];
     }
 
     protected abstract decimal Calculate(decimal value, decimal lastValue);
 
-    private decimal Aggregate() {
+    private decimal Aggregate(PriceCandle candle) {
       switch (ValueType) {
-        case IndicatorValueType.Average: return InPeriodTicks.Average();
-        case IndicatorValueType.Open: return InPeriodTicks.First();
-        case IndicatorValueType.Close: return InPeriodTicks.Last();
-        case IndicatorValueType.Min: return InPeriodTicks.Min();
-        case IndicatorValueType.Max: return InPeriodTicks.Max();
-        default: return InPeriodTicks.Average();
+        case IndicatorValueType.Average: return candle.Average;
+        case IndicatorValueType.Open: return candle.Open;
+        case IndicatorValueType.Close: return candle.Close;
+        case IndicatorValueType.Min: return candle.Min;
+        case IndicatorValueType.Max: return candle.Max;
+        default: return candle.Average;
       }
     }
   }
