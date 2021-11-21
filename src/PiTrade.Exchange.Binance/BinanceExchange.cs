@@ -18,7 +18,7 @@ namespace PiTrade.Exchange.Binance {
     private readonly object locker = new object();
 
     private long serverDeltaTime;
-    private long ServerDeltaTime {
+    private long Ping {
       get { lock (locker) { return serverDeltaTime; } }
       set { lock (locker) { serverDeltaTime = value; } }
     }
@@ -51,7 +51,7 @@ namespace PiTrade.Exchange.Binance {
     #region Private Methods
     private async Task InitExchange() {
       var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
-      ServerDeltaTime = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+      Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
       var markets = new List<IMarket>();
       foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>()) {
@@ -67,13 +67,14 @@ namespace PiTrade.Exchange.Binance {
       }
       AvailableMarkets = markets;
       RefreshServerDeltaTime();
+      //var timer = new Timer()
     }
 
     private void RefreshServerDeltaTime() =>
       Task.Delay(TimeSpan.FromMinutes(1))
           .ContinueWith(t => Send<ExchangeInformation>("/api/v3/time", HttpMethod.Get)
           .ContinueWith(r => {
-            ServerDeltaTime = r.Result.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            Ping = r.Result.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             RefreshServerDeltaTime();
           }));
     #endregion
@@ -149,17 +150,22 @@ namespace PiTrade.Exchange.Binance {
             JsonConvert.SerializeObject(content),
             Encoding.UTF8, "application/json");
 
-        var response = await Client.SendAsync(request);
-        var json = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode) {
-          Log.Error(response);
-          Log.Error(json);
-        }
-
+        try {
+          var response = await Client.SendAsync(request);
+          var json = await response.Content.ReadAsStringAsync();
+          if (!response.IsSuccessStatusCode) {
+            Log.Error(requestUri);
+            Log.Error(response);
+            Log.Error(json);
+          }
 #pragma warning disable CS8603 // Possible null reference return.
-        return typeof(T) != typeof(EmptyJsonResponse) ?
-               JsonConvert.DeserializeObject<T>(json) : default(T);
+          return typeof(T) != typeof(EmptyJsonResponse) ?
+                 JsonConvert.DeserializeObject<T>(json) : default(T);
 #pragma warning restore CS8603 // Possible null reference return.
+        } catch (Exception e) {
+          Log.Error(e.Message);
+        }
+        return default(T);
       }
     }
 
@@ -173,7 +179,7 @@ namespace PiTrade.Exchange.Binance {
     private string PrepareQueryString(IDictionary<string, object> query, bool sign = true) {
       if (sign) {
         query.Add("recvWindow", 20000);
-        query.Add("timestamp", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ServerDeltaTime);
+        query.Add("timestamp", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + Ping);
       }
 
       var queryString = string.Join("&", query

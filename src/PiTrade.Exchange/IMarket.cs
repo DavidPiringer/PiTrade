@@ -18,14 +18,9 @@ namespace PiTrade.Exchange {
     IEnumerable<IIndicator> Indicators { get; }
 
     void AddIndicator(IIndicator indicator);
-    Task<Order> Buy(decimal price, decimal quantity);
-    Task<Order> Sell(decimal price, decimal quantity);
-    Task Cancel(Order order);
-    Task CancelAll();
-    Task Listen(
-      Func<Order, Task> onBuy,
-      Func<Order, Task> onSell,
-      Func<decimal, Task> onPriceUpdate,
-      CancellationToken token);
+
+
+    void Register(IMarketListener listener);
+    void Unregister(IMarketListener listener);
   }
 }

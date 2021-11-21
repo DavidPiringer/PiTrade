@@ -31,6 +31,6 @@ namespace PiTrade.Logging.Logger {
       }
     }
 
-    private static string FormatMessage(string prefix, string message) => $"[{prefix}]@[{DateTime.Now.ToString("{dd.MM.yy - H:mm:ss}")}] {message}";
+    private static string FormatMessage(string prefix, string message) => $"[{prefix}]@[{DateTime.Now.ToString("dd.MM.yy - H:mm:ss")}] {message}";
   }
 }

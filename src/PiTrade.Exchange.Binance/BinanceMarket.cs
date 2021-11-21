@@ -2,6 +2,7 @@
 using PiTrade.Exchange.Binance.Domain;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
+using PiTrade.Logging;
 using PiTrade.Networking;
 using System;
 using System.Collections.Concurrent;
@@ -16,9 +17,6 @@ namespace PiTrade.Exchange.Binance {
     private readonly Uri Uri;
 
 
-    private event Func<Order, Task> BuyOrderTriggered;
-    private event Func<Order, Task> SellOrderTriggered;
-    private event Func<decimal, Task> PriceUpdate;
 
     public new BinanceExchange Exchange { get; }
 
@@ -28,10 +26,7 @@ namespace PiTrade.Exchange.Binance {
       Uri = new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade");
     }
 
-    public override async Task Listen(Func<Order, Task> onBuy, Func<Order, Task> onSell, Func<decimal, Task> onPriceUpdate, CancellationToken token) {
-      BuyOrderTriggered += onBuy;
-      SellOrderTriggered += onSell;
-      PriceUpdate += onPriceUpdate;
+    protected override async Task Listen(CancellationToken token) {
 
       if (!WS.IsConnected)
         await Run(token);
@@ -39,18 +34,23 @@ namespace PiTrade.Exchange.Binance {
 
 
     public async override Task Cancel(Order order) {
-      await base.Cancel(order);
-      await Exchange.Cancel(order);
+      if(ActiveOrders.Any(x => x.Id == order.Id)) {
+        await base.Cancel(order);
+        await Exchange.Cancel(order);
+      }
     }
 
     public async override Task CancelAll() {
-      await base.CancelAll();
-      await Exchange.CancelAll(this);
+      if(ActiveOrders.Count() > 0) {
+        await base.CancelAll();
+        await Exchange.CancelAll(this);
+      }
     }
 
 
     public override Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity) =>
       Exchange.NewOrder(this, side, price, quantity);
+
 
     private async Task Run(CancellationToken token) {
       await await Task.Factory.StartNew(async () => {
@@ -61,18 +61,22 @@ namespace PiTrade.Exchange.Binance {
           if (update == null) continue;
 
           CurrentPrice = update.Price;
-          await (PriceUpdate?.Invoke(update.Price) ?? Task.CompletedTask);
-          var triggeredOrder = ActiveOrders.Where(x => x.Id == update.OIDBuyer || x.Id == update.OIDSeller).FirstOrDefault();
-          if (triggeredOrder != null) {
-            triggeredOrder.Fill(update.Quantity);
-            switch (triggeredOrder.Side) {
-              case OrderSide.BUY:
-                await (BuyOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
-                break;
-              case OrderSide.SELL:
-                await (SellOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
-                break;
+          try {
+            await (PriceUpdate?.Invoke(update.Price) ?? Task.CompletedTask);
+            var triggeredOrder = ActiveOrders.Where(x => x.Id == update.OIDBuyer || x.Id == update.OIDSeller).FirstOrDefault();
+            if (triggeredOrder != null) {
+              triggeredOrder.Fill(update.Quantity);
+              switch (triggeredOrder.Side) {
+                case OrderSide.BUY:
+                  await (BuyOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
+                  break;
+                case OrderSide.SELL:
+                  await (SellOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
+                  break;
+              }
             }
+          } catch (Exception ex) { 
+            Log.Error($"[IN MARKET RUN] -> {ex.Message}");
           }
         }
         await WS.Disconnect();

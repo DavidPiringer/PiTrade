@@ -4,7 +4,9 @@ using PiTrade.Exchange;
 using PiTrade.Exchange.Binance;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Indicators;
+using PiTrade.Logging;
 using PiTrade.Strategy;
+using PiTrade.Strategy.Util;
 
 var configPath = @"C:\Users\David\Documents\binanceConfig.json";
 var config = JObject.Parse(File.ReadAllText(configPath));
@@ -18,13 +20,24 @@ if (key == null || secret == null)
 
 
 var exchange = new BinanceExchange(key, secret);
-var markets = exchange.AvailableMarkets;
-var mana_usdt = exchange.GetMarket(Symbol.MANA, Symbol.USDT);
 var tasks = new List<Task>();
 
-tasks.Add(Start(exchange.GetMarket(Symbol.MANA, Symbol.USDT), 605m, 15m, 0.9m));
-tasks.Add(Start(exchange.GetMarket(Symbol.ROSE, Symbol.USDT), 251m, 12.5m, 0.9m));
-tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 251m, 12.5m, 0.9m));
+var commissionMarket = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+if (commissionMarket == null) {
+  Log.Error("Commission Market is null.");
+  return;
+}
+
+//CommisionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+
+tasks.Add(commissionMarket.Listen(o => Task.CompletedTask, o => Task.CompletedTask, p => Task.Run(() => Console.WriteLine(p)), CancellationToken.None));
+//tasks.Add(Start(exchange.GetMarket(Symbol.COCOS, Symbol.USDT), 406m, 15m, 0.8m));
+//tasks.Add(Start(exchange.GetMarket(Symbol.GALA, Symbol.USDT), 406m, 15m, 0.8m));
+//tasks.Add(Start(exchange.GetMarket(Symbol.MITH, Symbol.USDT), 211m, 10.5m, 0.6m));
+//tasks.Add(Start(exchange.GetMarket(Symbol.DREP, Symbol.USDT), 211m, 10.5m, 0.8m));
+//tasks.Add(Start(exchange.GetMarket(Symbol.GTO, Symbol.USDT), 211m, 10.5m, 0.6m));
+//tasks.Add(Start(exchange.GetMarket(Symbol.KEY, Symbol.USDT), 422m, 10.5m, 0.6m));
+
 
 Task.WaitAll(tasks.ToArray());
 

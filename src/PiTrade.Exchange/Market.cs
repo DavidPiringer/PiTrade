@@ -12,13 +12,16 @@ namespace PiTrade.Exchange {
     private readonly object locker = new object();
     private readonly IDictionary<long, PriceCandleTicker> priceCandleTickers = new Dictionary<long, PriceCandleTicker>();
     private readonly IList<IIndicator> indicators = new List<IIndicator>();
+    private readonly HashSet<IMarketListener> marketListeners = new HashSet<IMarketListener>();
+    
+    protected IEnumerable<IMarketListener> Listeners => marketListeners;
 
     public IExchange Exchange { get; }
     public Symbol Asset { get; }
     public Symbol Quote { get; }
     public int AssetPrecision { get; }
     public int QuotePrecision { get; }
-    public IEnumerable<Order> ActiveOrders => orders.Values;
+    //public IEnumerable<Order> ActiveOrders => orders.Values;
     public IEnumerable<IIndicator> Indicators => indicators.ToArray();
 
     public decimal CurrentPrice {
@@ -32,10 +35,11 @@ namespace PiTrade.Exchange {
     }
 
 
+    private CancellationTokenSource CTS { get; set; } = new CancellationTokenSource();
+    private Task? ListenTask { get; set; }
 
-    //TODO: listen -> return MarketHandle, add indicators (MA50, ..)
+
     private ConcurrentDictionary<long, Order> orders = new ConcurrentDictionary<long, Order>();
-
     private decimal currentPrice;
 
     public Market(IExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision) {
@@ -83,11 +87,21 @@ namespace PiTrade.Exchange {
       await Task.Run(() => orders.Clear());
 
 
+    public void Register(IMarketListener listener) {
+      if (ListenTask == null)
+        ListenTask = Listen(CTS.Token);
+      listener.ActiveOrders = new ConcurrentBag<Order>();
+      marketListeners.Add(listener);
+    }
+    public void Unregister(IMarketListener listener) => marketListeners.Remove(listener);
     public abstract Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity);
-    public abstract Task Listen(Func<Order, Task> onBuy, Func<Order, Task> onSell, Func<decimal, Task> onPriceUpdate, CancellationToken token);
+
 
     public override string ToString() => $"{Asset}{Quote}";
 
+    protected virtual Task Listen(CancellationToken token) {
+
+    }
 
     private void OnPriceUpdate(decimal price) {
       foreach (var ticker in priceCandleTickers.Values)

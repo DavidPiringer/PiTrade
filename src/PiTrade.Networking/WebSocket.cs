@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
+using PiTrade.Logging;
 
 namespace PiTrade.Networking {
   public class WebSocket {
@@ -26,16 +27,21 @@ namespace PiTrade.Networking {
       var buffer = new byte[ReceiveBufferSize];
       string msg = "";
       using (MemoryStream outputStream = new MemoryStream(ReceiveBufferSize)) {
-        WebSocketReceiveResult receiveResult;
-        do {
-          receiveResult = await WS.ReceiveAsync(buffer, token);
-          if (receiveResult.MessageType != WebSocketMessageType.Close)
-            outputStream.Write(buffer, 0, receiveResult.Count);
-        } while (!receiveResult.EndOfMessage);
-        outputStream.Position = 0;
+        try {
+          WebSocketReceiveResult receiveResult;
+          do {
+              receiveResult = await WS.ReceiveAsync(buffer, token);
+              if (receiveResult.MessageType != WebSocketMessageType.Close)
+                outputStream.Write(buffer, 0, receiveResult.Count);
+          
+          } while (!receiveResult.EndOfMessage);
+          outputStream.Position = 0;
 
-        using (StreamReader reader = new StreamReader(outputStream))
-          msg = reader.ReadToEnd();
+          using (StreamReader reader = new StreamReader(outputStream))
+            msg = reader.ReadToEnd();
+        } catch (WebSocketException ex) {
+          Log.Error($"{ex.GetType().Name} - {ex.Message}");
+        }
       }
       return msg;
     }
