@@ -1,13 +1,9 @@
 ﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using PiTrade.Exchange.Entities;
 
 namespace PiTrade.Exchange.Binance.Domain {
   [JsonObject(MemberSerialization.OptIn)]
-  internal class TradeStreamUpdate {
+  internal class TradeStreamUpdate : ITradeUpdate {
     [JsonProperty(PropertyName = "p")]
     public decimal Price { get; set; }
 
@@ -19,5 +15,7 @@ namespace PiTrade.Exchange.Binance.Domain {
 
     [JsonProperty(PropertyName = "a")]
     public long OIDSeller { get; set; }
+
+    public bool Match(Order order) => order.Id == OIDSeller || order.Id == OIDBuyer;
   }
 }

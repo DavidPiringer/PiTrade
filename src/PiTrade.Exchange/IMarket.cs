@@ -14,13 +14,8 @@ namespace PiTrade.Exchange {
     Symbol Quote { get; }
     int AssetPrecision { get; }
     int QuotePrecision { get; }
-    IEnumerable<Order> ActiveOrders { get; }
     IEnumerable<IIndicator> Indicators { get; }
-
     void AddIndicator(IIndicator indicator);
-
-
-    void Register(IMarketListener listener);
-    void Unregister(IMarketListener listener);
+    IMarketHandle GetMarketHandle(IOrderListener listener);
   }
 }

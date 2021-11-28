@@ -26,61 +26,89 @@ namespace PiTrade.Exchange.Binance {
       Uri = new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade");
     }
 
-    protected override async Task Listen(CancellationToken token) {
+    //protected override async Task Listen(CancellationToken token) {
+    //
+    //  if (!WS.IsConnected)
+    //    await Run(token);
+    //}
 
-      if (!WS.IsConnected)
-        await Run(token);
-    }
 
-
-    public async override Task Cancel(Order order) {
-      if(ActiveOrders.Any(x => x.Id == order.Id)) {
-        await base.Cancel(order);
+    protected async override Task CancelOrder(Order order) {
         await Exchange.Cancel(order);
-      }
     }
 
-    public async override Task CancelAll() {
-      if(ActiveOrders.Count() > 0) {
-        await base.CancelAll();
-        await Exchange.CancelAll(this);
-      }
-    }
+    //public async override Task CancelAll() {
+    //  if(ActiveOrders.Count() > 0) {
+    //    await base.CancelAll();
+    //    await Exchange.CancelAll(this);
+    //  }
+    //}
 
 
-    public override Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity) =>
+    protected override Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity) =>
       Exchange.NewOrder(this, side, price, quantity);
 
 
-    private async Task Run(CancellationToken token) {
-      await await Task.Factory.StartNew(async () => {
-        await WS.Connect(Uri);
-        while (!token.IsCancellationRequested) {
-          var msg = await WS.NextMessage();
-          var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
-          if (update == null) continue;
+    protected override async Task InitTradeLoop() {
+      await WS.Connect(Uri);
+    }
 
-          CurrentPrice = update.Price;
-          try {
-            await (PriceUpdate?.Invoke(update.Price) ?? Task.CompletedTask);
-            var triggeredOrder = ActiveOrders.Where(x => x.Id == update.OIDBuyer || x.Id == update.OIDSeller).FirstOrDefault();
-            if (triggeredOrder != null) {
-              triggeredOrder.Fill(update.Quantity);
-              switch (triggeredOrder.Side) {
-                case OrderSide.BUY:
-                  await (BuyOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
-                  break;
-                case OrderSide.SELL:
-                  await (SellOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
-                  break;
-              }
-            }
-          } catch (Exception ex) { 
-            Log.Error($"[IN MARKET RUN] -> {ex.Message}");
-          }
+    protected override async Task<ITradeUpdate?> TradeUpdateLoopCycle(CancellationToken token) {
+      while (!token.IsCancellationRequested) {
+        string? msg = null;
+        try {
+          msg = await WS.NextMessage(); //TODO: nextmessage out param -> return bool (Success)?
+        } catch (Exception ex) {
+          Log.Error($"[OrderUpdateLoopCycle] -> {ex.Message}");
+          continue;
         }
-        await WS.Disconnect();
-      }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+        var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg); //TODO -> TradeStreamUpdate to BinanceTradeStreamUpdate?
+        if (update == null) continue;
+        else return update;
+        /*
+        await (PriceUpdate?.Invoke(update.Price) ?? Task.CompletedTask);
+        var triggeredOrder = ActiveOrders.Where(x => x.Id == update.OIDBuyer || x.Id == update.OIDSeller).FirstOrDefault();
+        if (triggeredOrder != null) {
+          triggeredOrder.Fill(update.Quantity);
+          switch (triggeredOrder.Side) {
+            case OrderSide.BUY:
+              OnBuy(triggeredOrder);
+              //await (BuyOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
+              break;
+            case OrderSide.SELL:
+              OnSell(triggeredOrder);
+              //await (SellOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
+              break;
+          }
+        }*/
+      }
+      return null;
+    }
+
+    protected override async Task ExitTradeLoop() {
+      await WS.Disconnect();
+    }
+
+    // Generics -> Market<TradeTickCycle> -> liefert IOrderMatch oder so
+    private async Task UpdateHandle(IMarketHandle handle, TradeStreamUpdate update) { //TODO -> move into Market/MarketHandle (zumindest Exchange assembly)
+      var triggeredOrder = handle.ActiveOrders
+        .Where(x => x.Id == update.OIDBuyer || x.Id == update.OIDSeller)
+        .FirstOrDefault();
+
+      if (triggeredOrder != null) {
+        triggeredOrder.Fill(update.Quantity);
+        switch (triggeredOrder.Side) {
+          case OrderSide.BUY:
+            OnBuy(triggeredOrder);
+            //await (BuyOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
+            break;
+          case OrderSide.SELL:
+            OnSell(triggeredOrder);
+            //await (SellOrderTriggered?.Invoke(triggeredOrder) ?? Task.CompletedTask);
+            break;
+        }
+      }
     }
   }
 }

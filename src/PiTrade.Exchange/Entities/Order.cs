@@ -15,7 +15,7 @@ namespace PiTrade.Exchange.Entities {
     public decimal Amount => Price * Quantity;
     public decimal ExecutedQuantity { get; private set; } = 0;
     public decimal ExecutedAmount => Price * ExecutedQuantity;
-    public IEnumerable<decimal> Fills => fills;
+    public IEnumerable<decimal> Fills => fills.ToArray();
     public bool IsFilled => Quantity <= ExecutedQuantity;
 
 

@@ -7,8 +7,7 @@ using System.Threading.Tasks;
 using PiTrade.Exchange.Entities;
 
 namespace PiTrade.Exchange {
-  public interface IMarketListener {
-    IProducerConsumerCollection<Order> ActiveOrders { get; internal set; }
+  public interface IOrderListener {
     Task OnPriceUpdate(decimal price);
     Task OnBuy(Order order);
     Task OnSell(Order order);
