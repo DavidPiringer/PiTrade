@@ -81,15 +81,16 @@ namespace PiTrade.Exchange {
     protected void OnBuy(Order order) { 
     }
 
-    private Task TradeUpdateLoop(CancellationToken token) {
-      return Task.Factory.StartNew(async () => {
+    private Task TradeUpdateLoop(CancellationToken token) =>
+      Task.Factory.StartNew(async () => {
         while (token.IsCancellationRequested) {
           var update = await TradeUpdateLoopCycle(token);
-          foreach (var handle in marketHandles) { 
-          }
+          if(update != null)
+            foreach (var handle in marketHandles) 
+              handle.Update(update);
         }
       }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-    }
+    
 
     private void OnPriceUpdate(decimal price) {
       foreach (var ticker in priceCandleTickers.Values)
