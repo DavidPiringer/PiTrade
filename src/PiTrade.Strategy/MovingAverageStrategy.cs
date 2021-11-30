@@ -120,7 +120,7 @@ namespace PiTrade.Strategy {
 
       // setup buy order steps
       var steps = CalcBuySteps(basePrice,
-        NumSpace.Linear(0.90m, OrdersUntilBelowBasePrice - 0.1m, MaxOrderCount),
+        NumSpace.Linear(1m, OrdersUntilBelowBasePrice, MaxOrderCount),
         BuyStepSize)
         .OrderByDescending(x => x.Price);
 
