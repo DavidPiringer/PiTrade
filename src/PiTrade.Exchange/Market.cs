@@ -78,8 +78,6 @@ namespace PiTrade.Exchange {
     internal void RemoveMarketHandle(MarketHandle handle) =>
       marketHandles.Remove(handle);
 
-    protected void OnBuy(Order order) { 
-    }
 
     private Task TradeUpdateLoop(CancellationToken token) =>
       Task.Factory.StartNew(async () => {

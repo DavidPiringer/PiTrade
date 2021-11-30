@@ -28,7 +28,8 @@ if (commissionMarket == null) {
   return;
 }
 
-//CommisionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+CommisionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+
 
 //tasks.Add(commissionMarket.Listen(o => Task.CompletedTask, o => Task.CompletedTask, p => Task.Run(() => Console.WriteLine(p)), CancellationToken.None));
 //tasks.Add(Start(exchange.GetMarket(Symbol.COCOS, Symbol.USDT), 406m, 15m, 0.8m));
