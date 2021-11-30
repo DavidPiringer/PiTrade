@@ -13,7 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace PiTrade.Strategy {
-  public class MovingAverageStrategy {
+  public class MovingAverageStrategy : IOrderListener {
     #region Properties
     private readonly IMarket Market;
     private readonly decimal CommissionFee = 0.00075m;
@@ -40,6 +40,7 @@ namespace PiTrade.Strategy {
     private decimal Commission { get; set; } = 0m;
     private decimal CurrentAmount { get; set; } = 0m;
     private IList<Order> ExecutedOrders { get; } = new List<Order>();
+    private IMarketHandle MarketHandle { get; set; }
     #endregion
 
     #region Constructors
@@ -53,19 +54,19 @@ namespace PiTrade.Strategy {
 
     public async Task Run(CancellationToken token) {
       RestartTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-      await Market.Listen(OnBuy, OnSell, OnPriceUpdate, token);
-      foreach (var order in Market.ActiveOrders.Where(x => x.Side == OrderSide.BUY && !x.IsFilled)) {
-        await Market.Cancel(order);
-      }
+      //await Market.Listen(OnBuy, OnSell, OnPriceUpdate, token);
+      MarketHandle = Market.GetMarketHandle(this);
+      //foreach (var order in Market.ActiveOrders.Where(x => x.Side == OrderSide.BUY && !x.IsFilled)) {
+      //  await Market.Cancel(order);
+      //}
     }
 
-    private async Task OnPriceUpdate(decimal price) {
+    public async Task OnPriceUpdate(decimal price) {
       if (!IsTrading && (RestartTime + RestartDelay) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
-        // TODO: nur kleine intervalle bis stop -> bei stop sofort verkaufen?
         await SetupTrade(price);
       } else if (IsTrading
           && SellOrder == null
-          && !Market.ActiveOrders.Any(x => x.ExecutedQuantity > 0)
+          && !MarketHandle.ActiveOrders.Any(x => x.ExecutedQuantity > 0)
           && (TradeStart + 10) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
           && CurBuyOrder != null
           && CurBuyOrder.Price <= (price * 0.9975m)) {
@@ -73,16 +74,16 @@ namespace PiTrade.Strategy {
       }
     }
 
-    private async Task OnBuy(Order order) {
+    public async Task OnBuy(Order order) {
       var lastFill = order.Fills.LastOrDefault();
-      lock(locker) {
-        Quantity += lastFill; /* TODO: add later if BNB is depleted - lastFill * CommissionFee;*/
+      lock (locker) {
+        Quantity += lastFill;
         Quantity = Quantity.RoundDown(Market.AssetPrecision);
         Commission += lastFill * order.Price * CommissionFee;
         CurrentAmount += lastFill * order.Price;
         Revenue -= lastFill * order.Price;
       }
-      
+
 
       // calc sellPrice and update sell order
       var avg = ExecutedOrders.Sum(x => AvgOrderWeight(x));
@@ -96,7 +97,7 @@ namespace PiTrade.Strategy {
       }
     }
 
-    private async Task OnSell(Order order) {
+    public async Task OnSell(Order order) {
       var lastFill = order.Fills.LastOrDefault();
       lock (locker) {
         Quantity -= lastFill;
@@ -163,7 +164,7 @@ namespace PiTrade.Strategy {
     private async Task UpdateSellOrder(decimal price) {
       try {
         if (SellOrder != null) {
-          await Market.Cancel(SellOrder);
+          await MarketHandle.Cancel(SellOrder);
           SellOrder = null;
         }
 
@@ -185,8 +186,8 @@ namespace PiTrade.Strategy {
       }
       Log.Info($"[SETUP ORDER {side} {Market.Asset}{Market.Quote}] -> {quantity} [{Market.Asset}] @ {price} [{Market.Quote}]");
       switch (side) {
-        case OrderSide.BUY: return await Market.Buy(price, quantity);
-        case OrderSide.SELL: return await Market.Sell(price, quantity);
+        case OrderSide.BUY: return await MarketHandle.Buy(price, quantity);
+        case OrderSide.SELL: return await MarketHandle.Sell(price, quantity);
         default: return null;
       }
     }
@@ -214,7 +215,7 @@ namespace PiTrade.Strategy {
       }
 
       try {
-        await Market.CancelAll();
+        await MarketHandle.CancelAll();
         await CommisionManager.Add(Commission);
       } catch (Exception ex) { 
         Log.Error(ex);
@@ -239,5 +240,7 @@ namespace PiTrade.Strategy {
     private void PrintStats() { // TODO: thread safe static class for profits
       ProfitCalculator.PrintStats();
     }
+
+    
   }
 }

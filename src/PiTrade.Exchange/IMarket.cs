@@ -16,6 +16,6 @@ namespace PiTrade.Exchange {
     int QuotePrecision { get; }
     IEnumerable<IIndicator> Indicators { get; }
     void AddIndicator(IIndicator indicator);
-    IMarketHandle GetMarketHandle(IOrderListener listener);
+    IMarketHandle GetMarketHandle(IOrderListener? listener = null);
   }
 }

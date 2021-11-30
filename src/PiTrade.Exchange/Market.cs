@@ -57,7 +57,7 @@ namespace PiTrade.Exchange {
       }
     }
 
-    public IMarketHandle GetMarketHandle(IOrderListener listener) {
+    public IMarketHandle GetMarketHandle(IOrderListener? listener = null) {
       if (OrderFeedLoopTask == null)
         OrderFeedLoopTask = TradeUpdateLoop(CTS.Token);
       

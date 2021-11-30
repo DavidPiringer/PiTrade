@@ -30,7 +30,7 @@ if (commissionMarket == null) {
 
 //CommisionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
 
-tasks.Add(commissionMarket.Listen(o => Task.CompletedTask, o => Task.CompletedTask, p => Task.Run(() => Console.WriteLine(p)), CancellationToken.None));
+//tasks.Add(commissionMarket.Listen(o => Task.CompletedTask, o => Task.CompletedTask, p => Task.Run(() => Console.WriteLine(p)), CancellationToken.None));
 //tasks.Add(Start(exchange.GetMarket(Symbol.COCOS, Symbol.USDT), 406m, 15m, 0.8m));
 //tasks.Add(Start(exchange.GetMarket(Symbol.GALA, Symbol.USDT), 406m, 15m, 0.8m));
 //tasks.Add(Start(exchange.GetMarket(Symbol.MITH, Symbol.USDT), 211m, 10.5m, 0.6m));

@@ -10,12 +10,12 @@ using PiTrade.Exchange.Enums;
 namespace PiTrade.Exchange {
   public class MarketHandle : IMarketHandle {
     private readonly Market market;
-    private readonly IOrderListener listener;
+    private readonly IOrderListener? listener;
     private readonly ConcurrentDictionary<long, Order> orders = new ConcurrentDictionary<long, Order>();
 
     public IEnumerable<Order> ActiveOrders => orders.Values;
 
-    internal MarketHandle(Market market, IOrderListener listener) {
+    internal MarketHandle(Market market, IOrderListener? listener = null) {
       this.market = market;
       this.listener = listener;
     }
@@ -48,12 +48,13 @@ namespace PiTrade.Exchange {
       var matchedOrder = ActiveOrders.Where(x => update.Match(x)).FirstOrDefault();
       if (matchedOrder != null) {
         matchedOrder.Fill(update.Quantity);
-        await (matchedOrder.Side switch {
-          OrderSide.BUY => listener.OnBuy(matchedOrder),
-          OrderSide.SELL => listener.OnSell(matchedOrder),
-          _ => Task.CompletedTask
-        });
-
+        if (listener != null) {
+          await (matchedOrder.Side switch {
+            OrderSide.BUY => listener.OnBuy(matchedOrder),
+            OrderSide.SELL => listener.OnSell(matchedOrder),
+            _ => Task.CompletedTask
+          });
+        }
       }
     }
   }
