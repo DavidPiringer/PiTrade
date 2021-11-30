@@ -27,11 +27,12 @@ if (commissionMarket == null) {
   Log.Error("Commission Market is null.");
   return;
 }
+CommissionManager.Market = commissionMarket;
 
-CommissionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
-var testMarket = exchange.GetMarket(Symbol.MBOX, Symbol.USDT);
+
+var testMarket = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
 if(testMarket != null) {
-  var strategy = new MovingAverageStrategy(testMarket, 100m, 20m, 0.95m);
+  var strategy = new MovingAverageStrategy(testMarket, 210m, 10.5m, 0.96m);
   await strategy.Run(CancellationToken.None);
 }
 
