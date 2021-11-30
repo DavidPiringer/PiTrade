@@ -25,22 +25,21 @@ namespace PiTrade.Networking {
 
       var buffer = new byte[receiveBufferSize];
       string? msg = null;
-      using (MemoryStream outputStream = new MemoryStream(receiveBufferSize)) {
-        try {
-          WebSocketReceiveResult receiveResult;
-          do {
-              receiveResult = await Socket.ReceiveAsync(buffer, CTS.Token);
-              if (receiveResult.MessageType != WebSocketMessageType.Close)
-                outputStream.Write(buffer, 0, receiveResult.Count);
+      using MemoryStream outputStream = new(receiveBufferSize);
+      try {
+        WebSocketReceiveResult receiveResult;
+        do {
+            receiveResult = await Socket.ReceiveAsync(buffer, CTS.Token);
+            if (receiveResult.MessageType != WebSocketMessageType.Close)
+              outputStream.Write(buffer, 0, receiveResult.Count);
           
-          } while (!receiveResult.EndOfMessage);
-          outputStream.Position = 0;
+        } while (!receiveResult.EndOfMessage);
+        outputStream.Position = 0;
 
-          using (StreamReader reader = new StreamReader(outputStream))
-            msg = reader.ReadToEnd();
-        } catch (WebSocketException ex) {
-          Log.Error($"{ex.GetType().Name} - {ex.Message}");
-        }
+        using StreamReader reader = new(outputStream);
+        msg = reader.ReadToEnd();
+      } catch (WebSocketException ex) {
+        Log.Error($"{ex.GetType().Name} - {ex.Message}");
       }
       return msg;
     }
