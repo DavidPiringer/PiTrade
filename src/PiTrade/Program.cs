@@ -28,7 +28,7 @@ if (commissionMarket == null) {
   return;
 }
 
-CommisionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+CommissionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
 
 
 //tasks.Add(commissionMarket.Listen(o => Task.CompletedTask, o => Task.CompletedTask, p => Task.Run(() => Console.WriteLine(p)), CancellationToken.None));

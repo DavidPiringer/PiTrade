@@ -216,7 +216,7 @@ namespace PiTrade.Strategy {
 
       try {
         await MarketHandle.CancelAll();
-        await CommisionManager.Add(Commission);
+        await CommissionManager.Add(Commission);
       } catch (Exception ex) { 
         Log.Error(ex);
       }

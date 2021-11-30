@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using PiTrade.Exchange;
 
 namespace PiTrade.Strategy.Util {
-  public class CommisionManager {
+  public class CommissionManager {
     private static readonly object locker = new object();
     private static IMarket? market;
     public static IMarket? Market {
