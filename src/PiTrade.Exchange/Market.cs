@@ -31,7 +31,7 @@ namespace PiTrade.Exchange {
       }
     }
 
-    private CancellationTokenSource CTS { get; set; } = new CancellationTokenSource();
+    private CancellationTokenSource? CTS { get; set; }
     private Task? OrderFeedLoopTask { get; set; }
 
     private decimal currentPrice;
@@ -57,10 +57,13 @@ namespace PiTrade.Exchange {
       }
     }
 
-    public IMarketHandle GetMarketHandle(IOrderListener? listener = null) {
-      if (OrderFeedLoopTask == null)
+    public IMarketHandle GetMarketHandle(out Task awaitTask, IOrderListener? listener = null) {
+      if (OrderFeedLoopTask == null) {
+        CTS = new CancellationTokenSource();
         OrderFeedLoopTask = TradeUpdateLoop(CTS.Token);
-      
+      }
+        
+      awaitTask = OrderFeedLoopTask;
       var handle = new MarketHandle(this, listener);
       marketHandles.Add(handle);
       return handle;
@@ -75,20 +78,34 @@ namespace PiTrade.Exchange {
     protected abstract Task<ITradeUpdate?> TradeUpdateLoopCycle(CancellationToken token);
     protected abstract Task ExitTradeLoop();
 
-    internal void RemoveMarketHandle(MarketHandle handle) =>
+    internal void RemoveMarketHandle(MarketHandle handle) {
       marketHandles.Remove(handle);
+
+      // break order feed loop and cleanup
+      if (marketHandles.Count == 0 && OrderFeedLoopTask != null && CTS != null) {
+        CTS.Cancel();
+        OrderFeedLoopTask.Wait();
+        OrderFeedLoopTask.Dispose();
+        OrderFeedLoopTask = null;
+        CTS.Dispose();
+        CTS = null;
+      }
+    }
+
 
 
     private Task TradeUpdateLoop(CancellationToken token) =>
-      Task.Factory.StartNew(async () => {
-        while (token.IsCancellationRequested) {
-          var update = await TradeUpdateLoopCycle(token);
-          if(update != null)
-            foreach (var handle in marketHandles) 
+      Task.Factory.StartNew(() => {
+        InitTradeLoop().Wait();
+        while (!token.IsCancellationRequested) {
+          var update = TradeUpdateLoopCycle(token).GetAwaiter().GetResult();
+          if (update != null)
+            foreach (var handle in marketHandles)
               handle.Update(update);
         }
+        ExitTradeLoop().Wait();
       }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-    
+
 
     private void OnPriceUpdate(decimal price) {
       foreach (var ticker in priceCandleTickers.Values)

@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using PiTrade.Exchange;
 
 namespace PiTrade.Strategy.Util {
+
+  // TODO: Refactor this class
   public class CommissionManager {
     private static readonly object locker = new object();
     private static IMarket? market;
@@ -14,8 +16,11 @@ namespace PiTrade.Strategy.Util {
       set {
         lock (locker) {
           market = value;
-          if(Market != null)
-            MarketHandle = Market.GetMarketHandle();
+          if(Market != null) {
+            MarketHandle = Market.GetMarketHandle(out Task awaitTask);
+            AwaitTask = awaitTask;
+          }
+            
         }
       }
     }
@@ -23,6 +28,7 @@ namespace PiTrade.Strategy.Util {
     public static decimal Threshold { get; set; } = 15m;
     private static decimal Commission { get; set; }
     public static IMarketHandle? MarketHandle { get; set; }
+    public static Task? AwaitTask { get; set; }
 
 
     public static async Task Add(decimal commission) {

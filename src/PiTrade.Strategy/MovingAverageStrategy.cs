@@ -52,10 +52,10 @@ namespace PiTrade.Strategy {
     }
     #endregion
 
-    public async Task Run(CancellationToken token) {
+    public async Task Run(CancellationToken token) { // TODO: use token to stop market?
       RestartTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-      //await Market.Listen(OnBuy, OnSell, OnPriceUpdate, token);
-      MarketHandle = Market.GetMarketHandle(this);
+      MarketHandle = Market.GetMarketHandle(out Task awaitTask, this);
+      await awaitTask;
       //foreach (var order in Market.ActiveOrders.Where(x => x.Side == OrderSide.BUY && !x.IsFilled)) {
       //  await Market.Cancel(order);
       //}
@@ -120,14 +120,9 @@ namespace PiTrade.Strategy {
 
       // setup buy order steps
       var steps = CalcBuySteps(basePrice,
-        NumSpace.Linear(1.0m, OrdersUntilBelowBasePrice, MaxOrderCount),
+        NumSpace.Linear(0.90m, OrdersUntilBelowBasePrice - 0.1m, MaxOrderCount),
         BuyStepSize)
         .OrderByDescending(x => x.Price);
-
-      // calculate sum of all orders and check if the strategy is feasible
-      //var amountSum = steps.Sum(x => x.Amount);
-      //if (MaxQuote <= amountSum)
-      //  throw new Exception($"Cannot setup Strategy because of insufficient funds (Available = {MaxQuote}, Necessary = {amountSum}[{Market.Quote}])");
 
       // enqueue steps and start with first
       foreach (var step in steps)

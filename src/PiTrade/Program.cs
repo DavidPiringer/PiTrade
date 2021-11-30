@@ -29,7 +29,14 @@ if (commissionMarket == null) {
 }
 
 CommissionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+var testMarket = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
+if(testMarket != null) {
+  var strategy = new MovingAverageStrategy(testMarket, 211m, 10.5m, 0.95m);
+  await strategy.Run(CancellationToken.None);
+}
 
+if(CommissionManager.AwaitTask != null)
+  await CommissionManager.AwaitTask;
 
 //tasks.Add(commissionMarket.Listen(o => Task.CompletedTask, o => Task.CompletedTask, p => Task.Run(() => Console.WriteLine(p)), CancellationToken.None));
 //tasks.Add(Start(exchange.GetMarket(Symbol.COCOS, Symbol.USDT), 406m, 15m, 0.8m));
@@ -40,7 +47,7 @@ CommissionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
 //tasks.Add(Start(exchange.GetMarket(Symbol.KEY, Symbol.USDT), 422m, 10.5m, 0.6m));
 
 
-Task.WaitAll(tasks.ToArray());
+//Task.WaitAll(tasks.ToArray());
 
 Task Start(IMarket? market, decimal maxQuote, decimal buyStep, decimal low) {
   if(market != null) {

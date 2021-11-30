@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
+using PiTrade.Exchange.Extensions;
 
 namespace PiTrade.Exchange {
   public class MarketHandle : IMarketHandle {
@@ -21,13 +22,17 @@ namespace PiTrade.Exchange {
     }
 
     public async Task<Order> Buy(decimal price, decimal quantity) {
-      var order = await market.NewOrder(OrderSide.BUY, price, quantity);
+      var order = await market.NewOrder(OrderSide.BUY, 
+        price.RoundDown(market.QuotePrecision), 
+        quantity.RoundUp(market.AssetPrecision));
       orders.TryAdd(order.Id, order);
       return order;
     }
 
     public async Task<Order> Sell(decimal price, decimal quantity) {
-      var order = await market.NewOrder(OrderSide.SELL, price, quantity);
+      var order = await market.NewOrder(OrderSide.SELL, 
+        price.RoundUp(market.QuotePrecision), 
+        quantity.RoundDown(market.AssetPrecision));
       orders.TryAdd(order.Id, order);
       return order;
     }
@@ -45,6 +50,9 @@ namespace PiTrade.Exchange {
     public void Dispose() => market.RemoveMarketHandle(this);
 
     internal async void Update(ITradeUpdate update) {
+      if (listener != null)
+        await listener.OnPriceUpdate(update.Price);
+
       var matchedOrder = ActiveOrders.Where(x => update.Match(x)).FirstOrDefault();
       if (matchedOrder != null) {
         matchedOrder.Fill(update.Quantity);
