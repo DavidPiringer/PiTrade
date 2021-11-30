@@ -62,7 +62,7 @@ namespace PiTrade.Strategy {
     }
 
     public async Task OnPriceUpdate(decimal price) {
-      if (!IsTrading && (RestartTime + RestartDelay + 1000) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
+      if (!IsTrading && (RestartTime + RestartDelay) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
         await SetupTrade(price);
       } else if (IsTrading
           && SellOrder == null
