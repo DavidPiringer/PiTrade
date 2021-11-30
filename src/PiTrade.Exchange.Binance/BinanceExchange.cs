@@ -36,6 +36,8 @@ namespace PiTrade.Exchange.Binance {
 
     public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds() {
       var response = await SendSigned<AccountInformation>("/api/v3/account", HttpMethod.Get);
+      if(response == null) return new Dictionary<Symbol, decimal>();
+
       Dictionary<Symbol, decimal> funds = new Dictionary<Symbol, decimal>();
       foreach (var balance in response.Balances ?? Enumerable.Empty<AccountBalanceInformation>())
         if (balance.Asset != null)
@@ -51,18 +53,21 @@ namespace PiTrade.Exchange.Binance {
     #region Private Methods
     private async Task InitExchange() {
       var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
-      Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
       var markets = new List<IMarket>();
-      foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>()) {
-        if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null) {
-          var assetPrecision = symbol.Filters.Where(x => x.FilterType == "LOT_SIZE").Select(x => CalcPrecision(x.StepSize)).FirstOrDefault(-1);
-          var quotePrecision = symbol.Filters.Where(x => x.FilterType == "PRICE_FILTER").Select(x => CalcPrecision(x.TickSize)).FirstOrDefault(-1);
-          if (assetPrecision != -1 && quotePrecision != -1)
-            markets.Add(new BinanceMarket(this,
-              new Symbol(symbol.BaseAsset),
-              new Symbol(symbol.QuoteAsset),
-              assetPrecision, quotePrecision));
+
+      if (response != null) { 
+        Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>()) {
+          if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null) {
+            var assetPrecision = symbol.Filters.Where(x => x.FilterType == "LOT_SIZE").Select(x => CalcPrecision(x.StepSize)).FirstOrDefault(-1);
+            var quotePrecision = symbol.Filters.Where(x => x.FilterType == "PRICE_FILTER").Select(x => CalcPrecision(x.TickSize)).FirstOrDefault(-1);
+            if (assetPrecision != -1 && quotePrecision != -1)
+              markets.Add(new BinanceMarket(this,
+                new Symbol(symbol.BaseAsset),
+                new Symbol(symbol.QuoteAsset),
+                assetPrecision, quotePrecision));
+          }
         }
       }
       AvailableMarkets = markets;
@@ -74,7 +79,7 @@ namespace PiTrade.Exchange.Binance {
       Task.Delay(TimeSpan.FromMinutes(1))
           .ContinueWith(t => Send<ExchangeInformation>("/api/v3/time", HttpMethod.Get)
           .ContinueWith(r => {
-            Ping = r.Result.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            Ping = r.Result == null ? 0 : r.Result.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             RefreshServerDeltaTime();
           }));
     #endregion
@@ -121,10 +126,10 @@ namespace PiTrade.Exchange.Binance {
 
     #region Http Client Abstraction
 
-    private Task<EmptyJsonResponse> Send(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
+    private Task<EmptyJsonResponse?> Send(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
       Send<EmptyJsonResponse>(requestUri, method, query, content);
 
-    private async Task<T> Send<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
+    private async Task<T?> Send<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
       if (query == null)
         query = new Dictionary<string, object>();
 
@@ -132,10 +137,10 @@ namespace PiTrade.Exchange.Binance {
       return await SendRequest<T>($"{requestUri}?{queryString}", method, content);
     }
 
-    private Task<EmptyJsonResponse> SendSigned(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
+    private Task<EmptyJsonResponse?> SendSigned(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
       SendSigned<EmptyJsonResponse>(requestUri, method, query, content);
 
-    private async Task<T> SendSigned<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
+    private async Task<T?> SendSigned<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
       if (query == null)
         query = new Dictionary<string, object>();
 
@@ -143,7 +148,7 @@ namespace PiTrade.Exchange.Binance {
       return await SendRequest<T>($"{requestUri}?{queryString}", method, content);
     }
 
-    private async Task<T> SendRequest<T>(string requestUri, HttpMethod method, object? content) {
+    private async Task<T?> SendRequest<T>(string requestUri, HttpMethod method, object? content) {
       using (var request = new HttpRequestMessage(method, $"{BaseUri}{requestUri}")) {
         if (content != null)
           request.Content = new StringContent(
@@ -158,10 +163,8 @@ namespace PiTrade.Exchange.Binance {
             Log.Error(response);
             Log.Error(json);
           }
-#pragma warning disable CS8603 // Possible null reference return.
           return typeof(T) != typeof(EmptyJsonResponse) ?
                  JsonConvert.DeserializeObject<T>(json) : default(T);
-#pragma warning restore CS8603 // Possible null reference return.
         } catch (Exception e) {
           Log.Error(e.Message);
         }

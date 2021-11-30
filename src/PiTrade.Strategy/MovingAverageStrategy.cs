@@ -40,7 +40,7 @@ namespace PiTrade.Strategy {
     private decimal Commission { get; set; } = 0m;
     private decimal CurrentAmount { get; set; } = 0m;
     private IList<Order> ExecutedOrders { get; } = new List<Order>();
-    private IMarketHandle MarketHandle { get; set; }
+    private IMarketHandle? MarketHandle { get; set; }
     #endregion
 
     #region Constructors
@@ -62,11 +62,11 @@ namespace PiTrade.Strategy {
     }
 
     public async Task OnPriceUpdate(decimal price) {
-      if (!IsTrading && (RestartTime + RestartDelay) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
+      if (!IsTrading && (RestartTime + RestartDelay + 1000) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()) {
         await SetupTrade(price);
       } else if (IsTrading
           && SellOrder == null
-          && !MarketHandle.ActiveOrders.Any(x => x.ExecutedQuantity > 0)
+          && (!MarketHandle?.ActiveOrders.Any(x => x.ExecutedQuantity > 0) ?? false)
           && (TradeStart + 10) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
           && CurBuyOrder != null
           && CurBuyOrder.Price <= (price * 0.9975m)) {
@@ -159,7 +159,7 @@ namespace PiTrade.Strategy {
 
     private async Task UpdateSellOrder(decimal price) {
       try {
-        if (SellOrder != null) {
+        if (SellOrder != null && MarketHandle != null) {
           await MarketHandle.Cancel(SellOrder);
           SellOrder = null;
         }
@@ -181,11 +181,13 @@ namespace PiTrade.Strategy {
         return null;
       }
       Log.Info($"[SETUP ORDER {side} {Market.Asset}{Market.Quote}] -> {quantity} [{Market.Asset}] @ {price} [{Market.Quote}]");
-      switch (side) {
-        case OrderSide.BUY: return await MarketHandle.Buy(price, quantity);
-        case OrderSide.SELL: return await MarketHandle.Sell(price, quantity);
-        default: return null;
-      }
+      if (MarketHandle == null) return null;
+      
+      return side switch {
+        OrderSide.SELL => await MarketHandle.Sell(price, quantity),
+        OrderSide.BUY => await MarketHandle.Buy(price, quantity),
+        _ => null
+      };
     }
 
     private decimal AvgOrderWeight(Order order) =>
@@ -211,7 +213,8 @@ namespace PiTrade.Strategy {
       }
 
       try {
-        await MarketHandle.CancelAll();
+        if(MarketHandle != null)
+          await MarketHandle.CancelAll();
         await CommissionManager.Add(Commission);
       } catch (Exception ex) { 
         Log.Error(ex);

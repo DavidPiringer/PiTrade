@@ -49,6 +49,8 @@ namespace PiTrade.Exchange.Binance {
     protected override async Task<ITradeUpdate?> TradeUpdateLoopCycle(CancellationToken token) {
       try {
         var msg = await webSocket.NextMessage(); //TODO: nextmessage out param -> return bool (Success)?
+        if(msg == null) return null;
+
         var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
         return update;
       } catch (Exception ex) {
