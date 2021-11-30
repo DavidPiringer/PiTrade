@@ -8,10 +8,10 @@ using PiTrade.Logging;
 
 namespace PiTrade.Networking {
   public class WebSocket {
-    private static readonly int ReceiveBufferSize = 8192;
+    private static readonly int receiveBufferSize = 8192;
 
-    private readonly ClientWebSocket WS = new ClientWebSocket();
-    private readonly CancellationTokenSource CTS = new CancellationTokenSource();
+    private readonly ClientWebSocket webSocket = new ClientWebSocket();
+    private readonly CancellationTokenSource cts = new CancellationTokenSource();
 
     public bool IsConnected { get; private set; } = false;
 
@@ -20,17 +20,17 @@ namespace PiTrade.Networking {
 
 
     public async Task<string> NextMessage() {
-      if (WS.State != WebSocketState.Open)
+      if (webSocket.State != WebSocketState.Open)
         throw new InvalidOperationException("WebSocket is not connected. Call Connect(Uri) before.");
 
-      var token = CTS.Token;
-      var buffer = new byte[ReceiveBufferSize];
+      var token = cts.Token;
+      var buffer = new byte[receiveBufferSize];
       string msg = "";
-      using (MemoryStream outputStream = new MemoryStream(ReceiveBufferSize)) {
+      using (MemoryStream outputStream = new MemoryStream(receiveBufferSize)) {
         try {
           WebSocketReceiveResult receiveResult;
           do {
-              receiveResult = await WS.ReceiveAsync(buffer, token);
+              receiveResult = await webSocket.ReceiveAsync(buffer, token);
               if (receiveResult.MessageType != WebSocketMessageType.Close)
                 outputStream.Write(buffer, 0, receiveResult.Count);
           
@@ -52,18 +52,18 @@ namespace PiTrade.Networking {
 
     public async Task Connect(Uri connectionUri) {
       IsConnected = true;
-      await WS.ConnectAsync(connectionUri, CTS.Token);
+      await webSocket.ConnectAsync(connectionUri, cts.Token);
     }
 
     public async Task Disconnect() {
       IsConnected = false;
-      if (WS.State == WebSocketState.Open) {
-        CTS.CancelAfter(TimeSpan.FromSeconds(2));
-        await WS.CloseOutputAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
-        await WS.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+      if (webSocket.State == WebSocketState.Open) {
+        cts.CancelAfter(TimeSpan.FromSeconds(2));
+        await webSocket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
+        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
       }
-      WS.Dispose();
-      CTS.Dispose();
+      webSocket.Dispose();
+      cts.Dispose();
     }
 
     #region Dispose

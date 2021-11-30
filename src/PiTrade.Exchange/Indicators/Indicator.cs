@@ -9,32 +9,32 @@ using PiTrade.Logging;
 
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
-    protected readonly IndicatorValueType ValueType;
-    protected readonly int MaxTicks;
-    protected readonly PriceCandle[] PeriodTicks;
+    protected readonly IndicatorValueType valueType;
+    protected readonly int maxTicks;
+    protected readonly PriceCandle[] periodTicks;
 
     private int First { get; set; } = 0;
     private int Last { get; set; } = 0;
     private bool IsEmpty => First == Last;
-    public bool IsReady => ((Last + 1) % MaxTicks) == First;
+    public bool IsReady => ((Last + 1) % maxTicks) == First;
     public TimeSpan Period { get; private set; }    
     public decimal Value { get; private set; }
 
     public Indicator(TimeSpan period, IndicatorValueType indicatorValueType = IndicatorValueType.Close, int maxTicks = 100) {
       Period = period;
-      ValueType = indicatorValueType;
-      MaxTicks = maxTicks;
-      PeriodTicks = new PriceCandle[MaxTicks];
+      valueType = indicatorValueType;
+      this.maxTicks = maxTicks;
+      periodTicks = new PriceCandle[this.maxTicks];
     }
 
     public void Update(PriceCandle candle) {
       if(candle.Period.CompareTo(Period) == 0) {
-        First = IsReady ? (First + 1) % MaxTicks : First;
-        Last = (Last + 1) % MaxTicks;
-        PeriodTicks[Last] = candle;
+        First = IsReady ? (First + 1) % maxTicks : First;
+        Last = (Last + 1) % maxTicks;
+        periodTicks[Last] = candle;
           Value = IsReady ? 
             Calculate(Aggregate(candle), Value) : 
-            PeriodTicks.Where(x => x != null).Average(x => Aggregate(x));
+            periodTicks.Where(x => x != null).Average(x => Aggregate(x));
       } else {
         Log.Error($"Candle has not the same period as referenced ticker.");
       }
@@ -43,7 +43,7 @@ namespace PiTrade.Exchange.Indicators {
     protected abstract decimal Calculate(decimal value, decimal lastValue);
 
     private decimal Aggregate(PriceCandle candle) {
-      switch (ValueType) {
+      switch (valueType) {
         case IndicatorValueType.Average: return candle.Average;
         case IndicatorValueType.Open: return candle.Open;
         case IndicatorValueType.Close: return candle.Close;

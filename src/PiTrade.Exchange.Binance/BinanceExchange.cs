@@ -13,24 +13,24 @@ using System.Web;
 namespace PiTrade.Exchange.Binance {
   public sealed class BinanceExchange : IExchange {
     private const string BaseUri = "https://api.binance.com";
-    private readonly string Secret;
-    private readonly HttpClient Client;
+    private readonly string secret;
+    private readonly HttpClient client;
     private readonly object locker = new object();
 
-    private long serverDeltaTime;
+    private long ping;
     private long Ping {
-      get { lock (locker) { return serverDeltaTime; } }
-      set { lock (locker) { serverDeltaTime = value; } }
+      get { lock (locker) { return ping; } }
+      set { lock (locker) { ping = value; } }
     }
 
     public IEnumerable<IMarket> AvailableMarkets { get; private set; } = Enumerable.Empty<IMarket>();
 
     public BinanceExchange(string key, string secret) {
-      Secret = secret;
-      Client = new HttpClient();
-      Client.BaseAddress = new Uri(BaseUri);
-      Client.Timeout = TimeSpan.FromSeconds(10);
-      Client.DefaultRequestHeaders.Add("X-MBX-APIKEY", key);
+      this.secret = secret;
+      client = new HttpClient();
+      client.BaseAddress = new Uri(BaseUri);
+      client.Timeout = TimeSpan.FromSeconds(10);
+      client.DefaultRequestHeaders.Add("X-MBX-APIKEY", key);
       InitExchange().Wait();
     }
 
@@ -151,7 +151,7 @@ namespace PiTrade.Exchange.Binance {
             Encoding.UTF8, "application/json");
 
         try {
-          var response = await Client.SendAsync(request);
+          var response = await client.SendAsync(request);
           var json = await response.Content.ReadAsStringAsync();
           if (!response.IsSuccessStatusCode) {
             Log.Error(requestUri);
@@ -170,7 +170,7 @@ namespace PiTrade.Exchange.Binance {
     }
 
     private string Sign(string rawData) {
-      using (HMACSHA256 sha256Hash = new HMACSHA256(Encoding.UTF8.GetBytes(Secret))) {
+      using (HMACSHA256 sha256Hash = new HMACSHA256(Encoding.UTF8.GetBytes(secret))) {
         byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
         return BitConverter.ToString(bytes).Replace("-", "").ToLower();
       }
