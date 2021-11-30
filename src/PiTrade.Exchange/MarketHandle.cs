@@ -43,7 +43,7 @@ namespace PiTrade.Exchange {
     }
 
     public async Task CancelAll() {
-      foreach(var order in ActiveOrders)
+      foreach(var order in ActiveOrders.Where(x => !x.IsFilled))
         await Cancel(order);
     }
 
@@ -63,6 +63,9 @@ namespace PiTrade.Exchange {
             _ => Task.CompletedTask
           });
         }
+
+        if(matchedOrder.IsFilled) // cleanup filled orders
+          orders.TryRemove(matchedOrder.Id, out Order? tmp);
       }
     }
   }

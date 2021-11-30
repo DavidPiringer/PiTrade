@@ -29,9 +29,9 @@ if (commissionMarket == null) {
 }
 
 CommissionManager.Market = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
-var testMarket = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
+var testMarket = exchange.GetMarket(Symbol.MBOX, Symbol.USDT);
 if(testMarket != null) {
-  var strategy = new MovingAverageStrategy(testMarket, 211m, 10.5m, 0.95m);
+  var strategy = new MovingAverageStrategy(testMarket, 211m, 10.5m, 0.75m);
   await strategy.Run(CancellationToken.None);
 }
 

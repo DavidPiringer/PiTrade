@@ -70,6 +70,7 @@ namespace PiTrade.Strategy {
           && (TradeStart + 10) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
           && CurBuyOrder != null
           && CurBuyOrder.Price <= (price * 0.9975m)) {
+        Log.Info("[RESTART]");
         await Clear();
       }
     }

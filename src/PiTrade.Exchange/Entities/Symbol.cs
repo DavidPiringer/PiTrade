@@ -28,6 +28,7 @@ namespace PiTrade.Exchange.Entities {
     public static Symbol COCOS => new Symbol("COCOS");
     public static Symbol STRAX => new Symbol("STRAX");
     public static Symbol ROSE => new Symbol("ROSE");
+    public static Symbol MBOX => new Symbol("MBOX");
     public static Symbol EUR => new Symbol("EUR");
     public static Symbol USDT => new Symbol("USDT");
 
