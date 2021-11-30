@@ -13,9 +13,7 @@ namespace PiTrade.Exchange {
     private readonly IOrderListener listener;
     private readonly ConcurrentDictionary<long, Order> orders = new ConcurrentDictionary<long, Order>();
 
-
     public IEnumerable<Order> ActiveOrders => orders.Values;
-
 
     internal MarketHandle(Market market, IOrderListener listener) {
       this.market = market;

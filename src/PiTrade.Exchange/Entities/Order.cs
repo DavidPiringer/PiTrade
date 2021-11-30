@@ -29,7 +29,7 @@ namespace PiTrade.Exchange.Entities {
       Quantity = quantity;
     }
 
-    public void Fill(decimal quantity) {
+    internal void Fill(decimal quantity) {
       fills.Add(quantity);
       ExecutedQuantity += quantity;
     }
