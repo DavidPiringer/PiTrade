@@ -22,13 +22,8 @@ namespace PiTrade.Exchange {
     public IEnumerable<IIndicator> Indicators => indicators.ToArray();
 
     public decimal CurrentPrice {
-      get => currentPrice;
-      protected set {
-        lock (locker) {
-          OnPriceUpdate(value);
-          currentPrice = value;
-        }
-      }
+      get { lock(locker) { return currentPrice; } }
+      protected set { lock (locker) { currentPrice = value; } }
     }
 
     private CancellationTokenSource? CTS { get; set; }
@@ -92,8 +87,6 @@ namespace PiTrade.Exchange {
       }
     }
 
-
-
     private Task TradeUpdateLoop(CancellationToken token) =>
       Task.Factory.StartNew(() => {
         InitTradeLoop().Wait();
@@ -101,6 +94,10 @@ namespace PiTrade.Exchange {
           var update = TradeUpdateLoopCycle(token).GetAwaiter().GetResult();
           if (update != null) {
             CurrentPrice = update.Price;
+            // update indicators
+            foreach (var ticker in priceCandleTickers.Values)
+              ticker.PriceUpdate(update.Price);
+            // update marketHandles
             foreach (var handle in marketHandles)
               handle.Update(update);
           }
@@ -108,12 +105,6 @@ namespace PiTrade.Exchange {
         }
         ExitTradeLoop().Wait();
       }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-
-
-    private void OnPriceUpdate(decimal price) {
-      foreach (var ticker in priceCandleTickers.Values)
-        ticker.PriceUpdate(price);
-    }
 
   }
 }
