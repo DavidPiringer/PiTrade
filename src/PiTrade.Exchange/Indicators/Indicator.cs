@@ -19,6 +19,7 @@ namespace PiTrade.Exchange.Indicators {
     public bool IsReady => ((Last + 1) % maxTicks) == First;
     public TimeSpan Period { get; private set; }    
     public decimal Value { get; private set; }
+    public double Slope { get; private set; }
 
     public Indicator(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
       Period = period;
@@ -32,9 +33,10 @@ namespace PiTrade.Exchange.Indicators {
         First = IsReady ? (First + 1) % maxTicks : First;
         Last = (Last + 1) % maxTicks;
         periodTicks[Last] = candle;
-          Value = IsReady ? 
-            Calculate(Aggregate(candle), Value) : 
-            periodTicks.Where(x => x != null).Average(x => Aggregate(x));
+        var tmp = Value;
+        Value = IsEmpty ? Aggregate(candle) : Calculate(Aggregate(candle), Value);
+        var diff = (double)(Value - tmp);
+        Slope = Math.Atan(diff / 1.0) * (180.0 / Math.PI);
       } else {
         Log.Error($"Candle has not the same period as referenced ticker.");
       }

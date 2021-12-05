@@ -10,6 +10,7 @@ namespace PiTrade.Exchange.Indicators {
     bool IsReady { get; }
     TimeSpan Period { get; }
     decimal Value { get; }
+    double Slope { get; }
     void Update(PriceCandle value);
   }
 }
