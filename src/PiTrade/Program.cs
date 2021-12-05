@@ -29,26 +29,15 @@ if (commissionMarket == null) {
 }
 CommissionManager.Market = commissionMarket;
 
+tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 400m, 40m, 0.9m));
+tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 400m, 40m, 0.96m));
+tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 400m, 40m, 0.96m));
+//tasks.Add(Start(exchange.GetMarket(Symbol.SAND, Symbol.USDT), 200m, 10m, 0.96m));
+//tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 700m, 35m, 0.96m));
 
-var testMarket = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
-if(testMarket != null) {
-  var strategy = new MovingAverageStrategy(testMarket, 210m, 10.5m, 0.96m);
-  await strategy.Run(CancellationToken.None);
-}
-
-if(CommissionManager.AwaitTask != null)
+Task.WaitAll(tasks.ToArray());
+if (CommissionManager.AwaitTask != null)
   await CommissionManager.AwaitTask;
-
-//tasks.Add(commissionMarket.Listen(o => Task.CompletedTask, o => Task.CompletedTask, p => Task.Run(() => Console.WriteLine(p)), CancellationToken.None));
-//tasks.Add(Start(exchange.GetMarket(Symbol.COCOS, Symbol.USDT), 406m, 15m, 0.8m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.GALA, Symbol.USDT), 406m, 15m, 0.8m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.MITH, Symbol.USDT), 211m, 10.5m, 0.6m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.DREP, Symbol.USDT), 211m, 10.5m, 0.8m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.GTO, Symbol.USDT), 211m, 10.5m, 0.6m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.KEY, Symbol.USDT), 422m, 10.5m, 0.6m));
-
-
-//Task.WaitAll(tasks.ToArray());
 
 Task Start(IMarket? market, decimal maxQuote, decimal buyStep, decimal low) {
   if(market != null) {

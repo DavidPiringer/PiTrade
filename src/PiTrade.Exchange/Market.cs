@@ -99,9 +99,12 @@ namespace PiTrade.Exchange {
         InitTradeLoop().Wait();
         while (!token.IsCancellationRequested) {
           var update = TradeUpdateLoopCycle(token).GetAwaiter().GetResult();
-          if (update != null)
+          if (update != null) {
+            CurrentPrice = update.Price;
             foreach (var handle in marketHandles)
               handle.Update(update);
+          }
+            
         }
         ExitTradeLoop().Wait();
       }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
