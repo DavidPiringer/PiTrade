@@ -9,8 +9,8 @@ namespace PiTrade.Exchange.Indicators {
   public class ExponentialMovingAverage : Indicator {
     public readonly decimal smoothing;
 
-    public ExponentialMovingAverage(TimeSpan period, IndicatorValueType indicatorValueType = IndicatorValueType.Close, int maxTicks = 100, decimal smoothing = 2m)
-      : base(period, indicatorValueType, maxTicks) {
+    public ExponentialMovingAverage(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close, decimal smoothing = 2m)
+      : base(period, maxTicks, indicatorValueType) {
       this.smoothing = smoothing;
     }
 

@@ -20,7 +20,7 @@ namespace PiTrade.Exchange.Indicators {
     public TimeSpan Period { get; private set; }    
     public decimal Value { get; private set; }
 
-    public Indicator(TimeSpan period, IndicatorValueType indicatorValueType = IndicatorValueType.Close, int maxTicks = 100) {
+    public Indicator(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
       Period = period;
       valueType = indicatorValueType;
       this.maxTicks = maxTicks;
