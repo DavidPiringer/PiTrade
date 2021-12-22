@@ -14,8 +14,9 @@ namespace PiTrade.Exchange.Indicators {
       this.smoothing = smoothing;
     }
 
-    protected override decimal Calculate(decimal value, decimal lastValue) =>
-      (value * (smoothing / maxTicks)) 
-      + lastValue * (1 - (smoothing / maxTicks));
+    protected override decimal Calculate(decimal value) =>
+      value * (smoothing / (maxTicks + 1)) + Value * (1 - (smoothing / (maxTicks + 1)));
+    
+      
   }
 }
