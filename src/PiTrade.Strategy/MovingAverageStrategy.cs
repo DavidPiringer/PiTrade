@@ -77,14 +77,15 @@ namespace PiTrade.Strategy {
 
     public async Task OnBuy(Order order) {
       var lastFill = order.Fills.LastOrDefault();
-      lock (locker) {
-        Quantity += lastFill;
-        Quantity = Quantity.RoundDown(Market.AssetPrecision);
-        Commission += lastFill * order.Price * CommissionFee;
-        CurrentAmount += lastFill * order.Price;
-        Revenue -= lastFill * order.Price;
+      if (lastFill != null) {
+        lock (locker) {
+          Quantity += lastFill.Quantity;
+          Quantity = Quantity.RoundDown(Market.AssetPrecision);
+          Commission += lastFill.Amount * CommissionFee;
+          CurrentAmount += lastFill.Amount;
+          Revenue -= lastFill.Amount;
+        }
       }
-
 
       // calc sellPrice and update sell order
       var avg = ExecutedOrders.Sum(x => AvgOrderWeight(x));
@@ -100,14 +101,15 @@ namespace PiTrade.Strategy {
 
     public async Task OnSell(Order order) {
       var lastFill = order.Fills.LastOrDefault();
-      lock (locker) {
-        Quantity -= lastFill;
-        Quantity = Quantity.RoundDown(Market.AssetPrecision);
-        Commission += lastFill * order.Price * CommissionFee;
-        Revenue += lastFill * order.Price;
-        if (AlreadyClearing) return;
+      if (lastFill != null) {
+        lock (locker) {
+          Quantity -= lastFill.Quantity;
+          Quantity = Quantity.RoundDown(Market.AssetPrecision);
+          Commission += lastFill.Amount * CommissionFee;
+          Revenue += lastFill.Amount;
+          if (AlreadyClearing) return;
+        }
       }
-
       if (order.IsFilled) {
         await Clear();
         PrintStats();

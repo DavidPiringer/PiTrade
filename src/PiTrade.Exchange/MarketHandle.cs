@@ -55,7 +55,7 @@ namespace PiTrade.Exchange {
 
       var matchedOrder = ActiveOrders.Where(x => update.Match(x)).FirstOrDefault();
       if (matchedOrder != null) {
-        matchedOrder.Fill(update.Quantity);
+        matchedOrder.Fill(update.Quantity, update.Price);
         if (listener != null) {
           await (matchedOrder.Side switch {
             OrderSide.BUY => listener.OnBuy(matchedOrder),

@@ -15,11 +15,11 @@ namespace PiTrade.Exchange.Entities {
     public decimal Amount => Price * Quantity;
     public decimal ExecutedQuantity { get; private set; } = 0;
     public decimal ExecutedAmount => Price * ExecutedQuantity;
-    public IEnumerable<decimal> Fills => fills.ToArray();
+    public IEnumerable<OrderFill> Fills => fills.ToArray();
     public bool IsFilled => Quantity <= ExecutedQuantity;
 
 
-    private IList<decimal> fills = new List<decimal>();
+    private IList<OrderFill> fills = new List<OrderFill>();
 
     public Order(long id, IMarket market, OrderSide side, decimal price, decimal quantity) {
       Id = id;
@@ -29,11 +29,18 @@ namespace PiTrade.Exchange.Entities {
       Quantity = quantity;
     }
 
-    internal void Fill(decimal quantity) {
-      fills.Add(quantity);
+    internal void Fill(decimal quantity, decimal price) {
+      fills.Add(new OrderFill(quantity, price));
       ExecutedQuantity += quantity;
     }
 
-    public override string ToString() => $"Id = {Id}, Market = {Market}, Side = {Side}, Price = {Price}, Quantity = {Quantity}, ExecutedQuantity = {ExecutedQuantity}, Amount = {Price * Quantity}";
+    public override string ToString() => 
+      $"Id = {Id}, " +
+      $"Market = {Market}, " +
+      $"Side = {Side}, " +
+      $"Price = {Price}, " +
+      $"Quantity = {Quantity}, " +
+      $"ExecutedQuantity = {ExecutedQuantity}, " +
+      $"Amount = {Price * Quantity}";
   }
 }

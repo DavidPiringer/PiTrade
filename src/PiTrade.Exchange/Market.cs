@@ -75,8 +75,7 @@ namespace PiTrade.Exchange {
 
     internal void RemoveMarketHandle(MarketHandle handle) {
       marketHandles.Remove(handle);
-
-      // break order feed loop and cleanup
+      // if no handles exists -> break order feed loop and cleanup
       if (marketHandles.Count == 0 && OrderFeedLoopTask != null && CTS != null) {
         CTS.Cancel();
         OrderFeedLoopTask.Wait();
