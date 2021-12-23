@@ -17,6 +17,7 @@ namespace PiTrade.Exchange.Entities {
     public decimal ExecutedAmount => Price * ExecutedQuantity;
     public IEnumerable<OrderFill> Fills => fills.ToArray();
     public bool IsFilled => Quantity <= ExecutedQuantity;
+    public decimal AvgFillPrice => Fills.Average(x => x.Price);
 
 
     private IList<OrderFill> fills = new List<OrderFill>();
@@ -42,5 +43,7 @@ namespace PiTrade.Exchange.Entities {
       $"Quantity = {Quantity}, " +
       $"ExecutedQuantity = {ExecutedQuantity}, " +
       $"Amount = {Price * Quantity}";
+
+    // TODO: dispose itself -> if not filled -> CancelOrder
   }
 }

@@ -66,8 +66,10 @@ namespace PiTrade.Exchange {
 
     public override string ToString() => $"{Asset}{Quote}";
 
-    
+
+    protected internal abstract Task<Order> MarketOrder(OrderSide side, decimal quantity);
     protected internal abstract Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity);
+    protected internal abstract Task<Order> StopLossOrder(OrderSide side, decimal stopPrice, decimal quantity);
     protected internal abstract Task CancelOrder(Order order);
     protected abstract Task InitTradeLoop();
     protected abstract Task<ITradeUpdate?> TradeUpdateLoopCycle(CancellationToken token);

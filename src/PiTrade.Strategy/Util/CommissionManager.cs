@@ -37,7 +37,7 @@ namespace PiTrade.Strategy.Util {
       }
       if(Commission >= Threshold && Market != null && MarketHandle != null) {
         var price = Market.CurrentPrice;
-        await MarketHandle.Buy(price, (Commission / price));
+        await MarketHandle.BuyLimit(price, (Commission / price));
         lock(locker) {
           Commission = 0m;
         }

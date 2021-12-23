@@ -37,10 +37,14 @@ namespace PiTrade.Exchange.Binance {
     //  }
     //}
 
+    protected override Task<Order> MarketOrder(OrderSide side, decimal quantity) =>
+      Exchange.MarketOrder(this, side, quantity);
 
     protected override Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity) =>
       Exchange.NewOrder(this, side, price, quantity);
 
+    protected override Task<Order> StopLossOrder(OrderSide side, decimal stopPrice, decimal quantity) =>
+      Exchange.StopLoss(this, side, stopPrice, quantity);
 
     protected override async Task InitTradeLoop() {
       await webSocket.Connect(uri);

@@ -21,7 +21,15 @@ namespace PiTrade.Exchange {
       this.listener = listener;
     }
 
-    public async Task<Order> Buy(decimal price, decimal quantity) {
+
+    public async Task<Order> Market(OrderSide side, decimal quantity) {
+      var order = await market.MarketOrder(side,
+        quantity.RoundUp(market.AssetPrecision));
+      orders.TryAdd(order.Id, order);
+      return order;
+    }
+
+    public async Task<Order> BuyLimit(decimal price, decimal quantity) {
       var order = await market.NewOrder(OrderSide.BUY, 
         price.RoundDown(market.QuotePrecision), 
         quantity.RoundUp(market.AssetPrecision));
@@ -29,9 +37,17 @@ namespace PiTrade.Exchange {
       return order;
     }
 
-    public async Task<Order> Sell(decimal price, decimal quantity) {
+    public async Task<Order> SellLimit(decimal price, decimal quantity) {
       var order = await market.NewOrder(OrderSide.SELL, 
         price.RoundUp(market.QuotePrecision), 
+        quantity.RoundDown(market.AssetPrecision));
+      orders.TryAdd(order.Id, order);
+      return order;
+    }
+
+    public async Task<Order> StopLoss(OrderSide side, decimal stopPrice, decimal quantity) {
+      var order = await market.StopLossOrder(side,
+        stopPrice.RoundUp(market.QuotePrecision),
         quantity.RoundDown(market.AssetPrecision));
       orders.TryAdd(order.Id, order);
       return order;

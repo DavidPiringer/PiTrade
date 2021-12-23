@@ -186,8 +186,8 @@ namespace PiTrade.Strategy {
       if (MarketHandle == null) return null;
       
       return side switch {
-        OrderSide.SELL => await MarketHandle.Sell(price, quantity),
-        OrderSide.BUY => await MarketHandle.Buy(price, quantity),
+        OrderSide.SELL => await MarketHandle.SellLimit(price, quantity),
+        OrderSide.BUY => await MarketHandle.BuyLimit(price, quantity),
         _ => null
       };
     }
