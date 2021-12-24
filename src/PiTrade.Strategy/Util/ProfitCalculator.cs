@@ -13,6 +13,10 @@ namespace PiTrade.Strategy.Util {
     internal static void Add(decimal profit) {
       lock(locker) {
         Profit += profit;
+        if (Profit < -10m) {
+          Log.Error($"Emergency Stop because of great losses -> Profit = {Profit}");
+          Environment.Exit(0);
+        }
       }
     }
 

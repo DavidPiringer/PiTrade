@@ -16,6 +16,8 @@ namespace PiTrade.Exchange {
 
     public IEnumerable<Order> ActiveOrders => orders.Values;
 
+    private decimal lastPrice = 0m;
+
     internal MarketHandle(Market market, IOrderListener? listener = null) {
       this.market = market;
       this.listener = listener;
@@ -66,9 +68,6 @@ namespace PiTrade.Exchange {
     public void Dispose() => market.RemoveMarketHandle(this);
 
     internal async void Update(ITradeUpdate update) {
-      if (listener != null)
-        await listener.OnPriceUpdate(update.Price);
-
       var matchedOrder = ActiveOrders.Where(x => update.Match(x)).FirstOrDefault();
       if (matchedOrder != null) {
         matchedOrder.Fill(update.Quantity, update.Price);
@@ -82,6 +81,11 @@ namespace PiTrade.Exchange {
 
         if(matchedOrder.IsFilled) // cleanup filled orders
           orders.TryRemove(matchedOrder.Id, out Order? tmp);
+      }
+
+      if (listener != null && update.Price != lastPrice) {
+        await listener.OnPriceUpdate(update.Price);
+        lastPrice = update.Price;
       }
     }
   }
