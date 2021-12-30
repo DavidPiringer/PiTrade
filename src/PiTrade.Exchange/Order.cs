@@ -4,9 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
 
-namespace PiTrade.Exchange.Entities {
+namespace PiTrade.Exchange {
   public class Order : IDisposable {
     private readonly object locker = new object();
 
