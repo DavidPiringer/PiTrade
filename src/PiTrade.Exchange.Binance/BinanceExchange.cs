@@ -36,7 +36,7 @@ namespace PiTrade.Exchange.Binance {
 
     public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds() {
       var response = await SendSigned<AccountInformation>("/api/v3/account", HttpMethod.Get);
-      if(response == null) return new Dictionary<Symbol, decimal>();
+      if (response == null) return new Dictionary<Symbol, decimal>();
 
       Dictionary<Symbol, decimal> funds = new Dictionary<Symbol, decimal>();
       foreach (var balance in response.Balances ?? Enumerable.Empty<AccountBalanceInformation>())
@@ -55,7 +55,7 @@ namespace PiTrade.Exchange.Binance {
       var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
       var markets = new List<IMarket>();
 
-      if (response != null) { 
+      if (response != null) {
         Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>()) {
@@ -85,7 +85,7 @@ namespace PiTrade.Exchange.Binance {
     #endregion
 
     #region Internal Methods
-    internal async Task<Order> MarketOrder(IMarket market, OrderSide side, decimal quantity) {
+    internal async Task<(Order? order, ErrorType error)> NewMarketOrder(Market market, OrderSide side, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -94,11 +94,11 @@ namespace PiTrade.Exchange.Binance {
         {"quantity", quantity}
       });
       if (response == null || response.Id == -1)
-        throw new Exception($"Response contains no order id ({response?.Id})");
-      return new Order(response.Id, market, side, market.CurrentPrice, quantity);
+        return (null, ErrorType.IdNotFound);
+      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorType.None);
     }
 
-    internal async Task<Order> NewOrder(IMarket market, OrderSide side, decimal price, decimal quantity) {
+    internal async Task<(Order? order, ErrorType error)> NewLimitOrder(Market market, OrderSide side, decimal price, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -109,28 +109,16 @@ namespace PiTrade.Exchange.Binance {
         {"price", price}
       });
       if (response == null || response.Id == -1)
-        throw new Exception($"Response contains no order id ({response?.Id})");
-      return new Order(response.Id, market, side, price, quantity);
+        return (null, ErrorType.IdNotFound);
+      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorType.None);
     }
 
-    internal async Task<Order> StopLoss(IMarket market, OrderSide side, decimal stopPrice, decimal quantity) {
-      var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
-      {
-        {"symbol", MarketString(market) },
-        {"side", side.ToString()},
-        {"type", "STOP_LOSS"},
-        {"quantity", quantity},
-        {"stopPrice", stopPrice}
-      });
-      if (response == null || response.Id == -1)
-        throw new Exception($"Response contains no order id ({response?.Id})");
-      return new Order(response.Id, market, side, stopPrice, quantity);
-    }
 
-    internal Task Cancel(Order order) =>
-      SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
+    internal async Task<ErrorType> Cancel(Order order) =>
+      await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
         { {"symbol", MarketString(order.Market) },
-        {"orderId", order.Id.ToString()} });
+        {"orderId", order.Id.ToString()} }) == null ? 
+      ErrorType.ConnectionLost : ErrorType.None;
 
 
     internal Task CancelAll(IMarket market) =>

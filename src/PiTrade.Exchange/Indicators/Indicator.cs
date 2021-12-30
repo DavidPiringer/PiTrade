@@ -11,13 +11,10 @@ namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
     protected readonly IndicatorValueType valueType;
     protected readonly int maxTicks;
-    //protected readonly PriceCandle[] periodTicks;
+    protected readonly IList<Func<IIndicator, Task>> listeners = new List<Func<IIndicator, Task>>();
 
     private int Tick { get; set; } = 0;
-    //private int First { get; set; } = 0;
-    //private int Last { get; set; } = 0;
-    //private bool IsEmpty => First == Last;
-    public bool IsReady => Tick >= maxTicks;//((Last + 1) % maxTicks) == First;
+    private bool IsReady => Tick >= maxTicks;
     public TimeSpan Period { get; private set; }    
     public decimal Value { get; private set; }
     public double Slope { get; private set; }
@@ -26,23 +23,27 @@ namespace PiTrade.Exchange.Indicators {
       Period = period;
       valueType = indicatorValueType;
       this.maxTicks = maxTicks;
-      //periodTicks = new PriceCandle[this.maxTicks];
     }
 
     public void Update(PriceCandle candle) {
       if(candle.Period.CompareTo(Period) == 0) {
-        //First = IsReady ? (First + 1) % maxTicks : First;
-        //Last = (Last + 1) % maxTicks;
-        //periodTicks[Last] = candle;
         var tmp = Value;
         Value = Tick == 0 ? candle.Average : Calculate(Aggregate(candle));
         var diff = (double)(Value - tmp);
         Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
         Tick = IsReady ? Tick : Tick + 1;
+
+        // update listeners
+        if (IsReady)
+          foreach (var listener in listeners)
+            listener(this);
       } else {
         Log.Error($"Candle has not the same period as referenced ticker.");
       }
     }
+
+    void Register(Func<IIndicator, Task> fnc) => listeners.Add(fnc);
+    void Unregister(Func<IIndicator, Task> fnc) => listeners.Remove(fnc);
 
     protected abstract decimal Calculate(decimal value);
 

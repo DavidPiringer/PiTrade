@@ -69,7 +69,7 @@ namespace PiTrade.Strategy {
           && (!MarketHandle?.ActiveOrders.Any(x => x.ExecutedQuantity > 0) ?? false)
           && (TradeStart + 10) <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
           && CurBuyOrder != null
-          && CurBuyOrder.Price <= (price * 0.9975m)) {
+          && CurBuyOrder.TargetPrice <= (price * 0.9975m)) {
         Log.Info("[RESTART]");
         await Clear();
       }
@@ -193,7 +193,7 @@ namespace PiTrade.Strategy {
     }
 
     private decimal AvgOrderWeight(Order order) =>
-      order.Price * (order.ExecutedAmount / CurrentAmount);
+      order.TargetPrice * (order.ExecutedAmount / CurrentAmount);
 
 
     private async Task<IEnumerable<decimal>> GetFunds(params Symbol[] symbols) {

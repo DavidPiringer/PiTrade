@@ -6,58 +6,85 @@ using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
+using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public class Order : IDisposable {
     private readonly object locker = new object();
+    private readonly TaskCompletionSource fillTCS = new TaskCompletionSource();
+
+    private decimal summedPriceFills = 0m;
+    private int fillCount = 0;
 
     public long Id { get; }
-    public IMarket Market { get; }
+    public Market Market { get; }
     public OrderSide Side { get; }
-    public decimal Price { get; }
+    public decimal TargetPrice { get; }
     public decimal Quantity { get; }
-    public decimal Amount => Price * Quantity;
-    public decimal ExecutedQuantity => Fills.Sum(x => x.Quantity);
-    public decimal ExecutedAmount => Price * ExecutedQuantity;
-    public IEnumerable<OrderFill> Fills => fills.ToArray();
+    public decimal Amount => AvgFillPrice * Quantity;
+    public decimal ExecutedAmount => AvgFillPrice * ExecutedQuantity;
+    public decimal ExecutedQuantity { get; private set; }
     public bool IsFilled => Quantity <= ExecutedQuantity;
-    public decimal AvgFillPrice => Fills.Average(x => x.Price);
+    public bool IsCancelled { get; private set; }
+    public decimal AvgFillPrice {
+      get {
+        lock (locker) { return summedPriceFills / fillCount; }
+      }
+    }
 
 
-    private ConcurrentBag<OrderFill> fills = new ConcurrentBag<OrderFill>();
-    private bool disposedValue;
-
-    public Order(long id, IMarket market, OrderSide side, decimal price, decimal quantity) {
+    public Order(long id, Market market, OrderSide side, decimal targetPrice, decimal quantity) {
       Id = id;
       Market = market;
       Side = side;
-      Price = price;
+      TargetPrice = targetPrice;
       Quantity = quantity;
+      market.RegisterOrder(this);
     }
 
-    internal void Fill(decimal quantity, decimal price) {
-      fills.Add(new OrderFill(quantity, price));
+
+    internal void Update(ITradeUpdate update) {
+      if (update.Match(this)) {
+        lock (locker) {
+          ExecutedQuantity += update.Quantity;
+          summedPriceFills += update.Price;
+          fillCount++;
+          if (IsFilled) fillTCS.SetResult();
+        }
+      }
     }
 
-    // TODO: NewOrder -> Returns Task<Order?> (no exceptions)
-    // TODO: Filled Status await with FillTask -> if and set mutex in fill
+    public async Task Cancel() {
+      if (!IsFilled && !IsCancelled) {
+        await ExponentialBackoff.Try(async () => ErrorType.ConnectionLost == await Market.CancelOrder(this));
+        IsCancelled = true;
+      }
+    }
 
-    public override string ToString() => 
+    public async Task WhenFilled(Func<Order, Task> fnc) {
+      await fillTCS.Task;
+      await fnc.Invoke(this);
+    }
+
+    public override string ToString() =>
       $"Id = {Id}, " +
       $"Market = {Market}, " +
       $"Side = {Side}, " +
-      $"Price = {Price}, " +
+      $"Price = {TargetPrice}, " +
       $"Quantity = {Quantity}, " +
       $"ExecutedQuantity = {ExecutedQuantity}, " +
-      $"Amount = {Price * Quantity}";
+      $"Amount = {TargetPrice * Quantity}";
 
 
+    #region Disposable Support
+    private bool disposedValue = false;
     protected virtual void Dispose(bool disposing) {
       if (!disposedValue) {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
         }
 
+        Cancel().Wait();
         // TODO: free unmanaged resources (unmanaged objects) and override finalizer
         // TODO: set large fields to null
         disposedValue = true;
@@ -75,7 +102,6 @@ namespace PiTrade.Exchange {
       Dispose(disposing: true);
       GC.SuppressFinalize(this);
     }
-
-    // TODO: dispose itself -> if not filled -> CancelOrder
+    #endregion
   }
 }

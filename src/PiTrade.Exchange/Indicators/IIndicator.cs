@@ -12,5 +12,7 @@ namespace PiTrade.Exchange.Indicators {
     decimal Value { get; }
     double Slope { get; }
     void Update(PriceCandle value);
+    void Register(Func<IIndicator, Task> fnc);
+    void Unregister(Func<IIndicator, Task> fnc);
   }
 }

@@ -12,7 +12,7 @@ namespace PiTrade.Exchange {
     private readonly object locker = new object();
     private readonly IDictionary<long, PriceCandleTicker> priceCandleTickers = new Dictionary<long, PriceCandleTicker>();
     private readonly ConcurrentBag<IIndicator> indicators = new ConcurrentBag<IIndicator>();
-    private readonly IList<MarketHandle> marketHandles = new List<MarketHandle>();
+    private readonly IList<Order> openOrders = new List<Order>();
 
     public IExchange Exchange { get; }
     public Symbol Asset { get; }
@@ -21,15 +21,11 @@ namespace PiTrade.Exchange {
     public int QuotePrecision { get; }
     public IEnumerable<IIndicator> Indicators => indicators.ToArray();
 
-    public decimal CurrentPrice {
-      get { lock(locker) { return currentPrice; } }
-      protected set { lock (locker) { currentPrice = value; } }
-    }
+    public decimal CurrentPrice { get; private set; }
 
     private CancellationTokenSource? CTS { get; set; }
-    private Task? OrderFeedLoopTask { get; set; }
+    private Task? MarketLoop { get; set; }
 
-    private decimal currentPrice;
 
     public Market(IExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision) {
       Exchange = exchange;
@@ -51,60 +47,61 @@ namespace PiTrade.Exchange {
         indicators.Add(indicator);
       }
     }
-
-    public IMarketHandle GetMarketHandle(out Task awaitTask, IOrderListener? listener = null) {
-      if (OrderFeedLoopTask == null) {
-        CTS = new CancellationTokenSource();
-        OrderFeedLoopTask = TradeUpdateLoop(CTS.Token);
-      }
         
-      awaitTask = OrderFeedLoopTask;
-      var handle = new MarketHandle(this, listener);
-      marketHandles.Add(handle);
-      return handle;
-    }
 
-    public override string ToString() => $"{Asset}{Quote}";
+    public abstract Task<(Order? order, ErrorType error)> CreateMarketOrder(OrderSide side, decimal quantity);
+    public abstract Task<(Order? order, ErrorType error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
 
-
-    protected internal abstract Task<Order> MarketOrder(OrderSide side, decimal quantity);
-    protected internal abstract Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity);
-    protected internal abstract Task<Order> StopLossOrder(OrderSide side, decimal stopPrice, decimal quantity);
-    protected internal abstract Task CancelOrder(Order order);
-    protected abstract Task InitTradeLoop();
-    protected abstract Task<ITradeUpdate?> TradeUpdateLoopCycle(CancellationToken token);
-    protected abstract Task ExitTradeLoop();
-
-    internal void RemoveMarketHandle(MarketHandle handle) {
-      marketHandles.Remove(handle);
-      // if no handles exists -> break order feed loop and cleanup
-      if (marketHandles.Count == 0 && OrderFeedLoopTask != null && CTS != null) {
-        CTS.Cancel();
-        OrderFeedLoopTask.Wait();
-        OrderFeedLoopTask.Dispose();
-        OrderFeedLoopTask = null;
-        CTS.Dispose();
-        CTS = null;
+    public Task Connect() {
+      if (MarketLoop == null) {
+        CTS = new CancellationTokenSource();
+        MarketLoop = CreateMarketLoop(CTS.Token);
       }
+      return MarketLoop;
     }
 
-    private Task TradeUpdateLoop(CancellationToken token) =>
+
+    /// <summary>
+    /// Registers a order to receive updates. This is called in order's constructor.
+    /// With this 'trick' it is possible to use the interface signature for child market 
+    /// types and still have a reference to all created orders.
+    /// </summary>
+    internal void RegisterOrder(Order order) => openOrders.Add(order);
+
+    //protected internal abstract Task<Order> MarketOrder(OrderSide side, decimal quantity);
+    //protected internal abstract Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity);
+    //protected internal abstract Task<Order> StopLossOrder(OrderSide side, decimal stopPrice, decimal quantity);
+    protected internal abstract Task<ErrorType> CancelOrder(Order order);
+    protected abstract Task InitMarketLoop();
+    protected abstract Task<ITradeUpdate?> MarketLoopCycle(CancellationToken token);
+    protected abstract Task ExitMarketLoop();
+
+
+    private Task CreateMarketLoop(CancellationToken token) =>
       Task.Factory.StartNew(() => {
-        InitTradeLoop().Wait();
+        InitMarketLoop().Wait();
         while (!token.IsCancellationRequested) {
-          var update = TradeUpdateLoopCycle(token).GetAwaiter().GetResult();
+          var update = MarketLoopCycle(token).GetAwaiter().GetResult();
           if (update != null) {
-            CurrentPrice = update.Price;
-            // update indicators
-            foreach (var ticker in priceCandleTickers.Values)
-              ticker.PriceUpdate(update.Price);
-            // update marketHandles
-            foreach (var handle in marketHandles)
-              handle.Update(update);
+            // update open orders
+            foreach (var order in openOrders.ToArray()) {
+              order.Update(update);
+              // remove filled or cancelled orders
+              if (order.IsFilled || order.IsCancelled) 
+                openOrders.Remove(order);
+            }
+
+            // update only if price has changed
+            if (CurrentPrice != update.Price) {
+              // update indicators
+              foreach (var ticker in priceCandleTickers.Values)
+                ticker.PriceUpdate(update.Price);
+
+              lock (locker) CurrentPrice = update.Price;
+            }
           }
-            
         }
-        ExitTradeLoop().Wait();
+        ExitMarketLoop().Wait();
       }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
   }

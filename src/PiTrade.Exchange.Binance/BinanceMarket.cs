@@ -26,46 +26,35 @@ namespace PiTrade.Exchange.Binance {
       uri = new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade");
     }
 
-    protected async override Task CancelOrder(Order order) {
+    public override Task<(Order? order, ErrorType error)> CreateMarketOrder(OrderSide side, decimal quantity) =>
+      Exchange.NewMarketOrder(this, side, quantity);
+
+    public override Task<(Order? order, ErrorType error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity) =>
+      Exchange.NewLimitOrder(this, side, price, quantity);
+
+    protected async override Task<ErrorType> CancelOrder(Order order) =>
         await Exchange.Cancel(order);
-    }
 
-    //public async override Task CancelAll() {
-    //  if(ActiveOrders.Count() > 0) {
-    //    await base.CancelAll();
-    //    await Exchange.CancelAll(this);
-    //  }
-    //}
-
-    protected override Task<Order> MarketOrder(OrderSide side, decimal quantity) =>
-      Exchange.MarketOrder(this, side, quantity);
-
-    protected override Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity) =>
-      Exchange.NewOrder(this, side, price, quantity);
-
-    protected override Task<Order> StopLossOrder(OrderSide side, decimal stopPrice, decimal quantity) =>
-      Exchange.StopLoss(this, side, stopPrice, quantity);
-
-    protected override async Task InitTradeLoop() {
+    protected override async Task InitMarketLoop() {
       await webSocket.Connect(uri);
     }
 
-    protected override async Task<ITradeUpdate?> TradeUpdateLoopCycle(CancellationToken token) {
+    protected override async Task<ITradeUpdate?> MarketLoopCycle(CancellationToken token) {
       try {
         var msg = await webSocket.NextMessage(); //TODO: nextmessage out param -> return bool (Success)?
         if(msg == null) return null;
 
-        var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
-        return update;
+        return JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
       } catch (Exception ex) {
         Log.Error($"[OrderUpdateLoopCycle] -> {ex.Message}");
         return null;
       }
     }
 
-    protected override async Task ExitTradeLoop() {
+    protected override async Task ExitMarketLoop() {
       await webSocket.Disconnect();
     }
 
+    
   }
 }
