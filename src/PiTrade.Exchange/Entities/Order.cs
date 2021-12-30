@@ -7,34 +7,24 @@ using System.Threading.Tasks;
 using PiTrade.Exchange.Enums;
 
 namespace PiTrade.Exchange.Entities {
-  public class Order {
+  public class Order : IDisposable {
     private readonly object locker = new object();
 
-    public long Id { get; private set; }
-    public IMarket Market { get; private set; }
-    public OrderSide Side { get; private set; }
-    public decimal Price { get; private set; }
-    public decimal Quantity { get; private set; }
+    public long Id { get; }
+    public IMarket Market { get; }
+    public OrderSide Side { get; }
+    public decimal Price { get; }
+    public decimal Quantity { get; }
     public decimal Amount => Price * Quantity;
-    public decimal ExecutedQuantity { get; private set; }
-    public decimal ExecutedAmount {
-      get {
-        lock (locker) return Price * ExecutedQuantity;
-      }
-    }
-
+    public decimal ExecutedQuantity => Fills.Sum(x => x.Quantity);
+    public decimal ExecutedAmount => Price * ExecutedQuantity;
     public IEnumerable<OrderFill> Fills => fills.ToArray();
-
-    public bool IsFilled {
-      get {
-        lock (locker) return Quantity <= ExecutedQuantity;
-      }
-    }
-
+    public bool IsFilled => Quantity <= ExecutedQuantity;
     public decimal AvgFillPrice => Fills.Average(x => x.Price);
 
 
     private ConcurrentBag<OrderFill> fills = new ConcurrentBag<OrderFill>();
+    private bool disposedValue;
 
     public Order(long id, IMarket market, OrderSide side, decimal price, decimal quantity) {
       Id = id;
@@ -46,10 +36,10 @@ namespace PiTrade.Exchange.Entities {
 
     internal void Fill(decimal quantity, decimal price) {
       fills.Add(new OrderFill(quantity, price));
-      lock (locker) {
-        ExecutedQuantity += quantity;
-      }
     }
+
+    // TODO: NewOrder -> Returns Task<Order?> (no exceptions)
+    // TODO: Filled Status await with FillTask -> if and set mutex in fill
 
     public override string ToString() => 
       $"Id = {Id}, " +
@@ -59,6 +49,31 @@ namespace PiTrade.Exchange.Entities {
       $"Quantity = {Quantity}, " +
       $"ExecutedQuantity = {ExecutedQuantity}, " +
       $"Amount = {Price * Quantity}";
+
+
+    protected virtual void Dispose(bool disposing) {
+      if (!disposedValue) {
+        if (disposing) {
+          // TODO: dispose managed state (managed objects)
+        }
+
+        // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+        // TODO: set large fields to null
+        disposedValue = true;
+      }
+    }
+
+    // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+    ~Order() {
+      // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+      Dispose(disposing: false);
+    }
+
+    public void Dispose() {
+      // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+      Dispose(disposing: true);
+      GC.SuppressFinalize(this);
+    }
 
     // TODO: dispose itself -> if not filled -> CancelOrder
   }
