@@ -33,14 +33,100 @@ namespace PiTrade.Strategy {
     private decimal Revenue { get; set; } = 0m;
     private bool IsSelling { get; set; } = false;
 
-    public WaveSurferStrategy(IMarket market, decimal allowedQuote, bool respendMoney) : base(market) { 
+    private double IndicatorSlopeShort { get; set; } = -1;
+    private double IndicatorSlopeLong { get; set; } = -1;
+
+    private Func<Task> State;
+
+
+    public WaveSurferStrategy(IMarket market, decimal allowedQuote, bool respendMoney) : base(market) {
+      State = PrepareBuy;
       ema5T36 = new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 36);
       ema5T120 = new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 120);
       market.AddIndicator(ema5T36);
       market.AddIndicator(ema5T120);
+      ema5T36.Listen(DoWorkEMA5T36);
+      ema5T120.Listen(DoWorkEMA5T120);
       this.allowedQuote = allowedQuote;
     } // TODO: add max. quote to fail for
 
+    private async Task DoWorkEMA5T36(IIndicator indicator) {
+      lock(locker) IndicatorSlopeShort = indicator.Slope;
+      Log.Info($"{IndicatorSlopeShort} - {IndicatorSlopeLong}");
+      await State();
+    }
+    private async Task DoWorkEMA5T120(IIndicator indicator) {
+      lock (locker) IndicatorSlopeLong = indicator.Slope;
+      await Task.CompletedTask;
+    }
+
+    private async Task PrepareBuy() {
+      if (buyOrder != null) return;
+
+      if (IndicatorSlopeShort > 0 && IndicatorSlopeLong > 0) {
+        var price = Market.CurrentPrice;
+        var quantity = allowedQuote / price;
+        Log.Info("BUY");
+        (Order? order, ErrorState error) = await Market.CreateLimitOrder(OrderSide.BUY, price, quantity);
+        if(error == ErrorState.None && order != null) {
+          this.buyOrder = order;
+          await order.WhenFilled(BuyFinished);
+        } else {
+          Log.Warn($"Error for BUY -> {error}");
+        }
+      }
+    }
+
+    //TODO: fix bug for multiple priceCandle calls at the same time
+    private async Task PrepareSell() {
+      if (sellOrder != null) return;
+
+      if (buyOrder != null && (IndicatorSlopeShort < 0 || IndicatorSlopeLong < 0)) {
+        var price = Market.CurrentPrice;
+        if (price > buyOrder.AvgFillPrice * (1m + UpperThreshold) ||
+            price < buyOrder.AvgFillPrice * (1m - LowerThreshold)) {
+          Log.Info("SELL");
+          (Order? order, ErrorState error) = await Market.CreateMarketOrder(OrderSide.SELL, buyOrder.Quantity);
+          if (error == ErrorState.None && order != null) {
+            this.sellOrder = order;
+            await order.WhenFilled(SellFinished);
+          } else {
+            Log.Warn($"Error for SELL -> {error}");
+          }
+        }
+      }
+    }
+
+    private async Task BuyFinished(Order buyOrder) {
+      Log.Info("BUY FINISHED");
+      await Task.CompletedTask;
+      lock (locker) {
+        Quantity += buyOrder.Quantity;
+        Quantity = Quantity.RoundDown(Market.AssetPrecision);
+        Commission += buyOrder.Amount * CommissionFee;
+        Revenue -= buyOrder.Amount;
+        State = PrepareSell;
+      }
+    }
+
+    private async Task SellFinished(Order sellOrder) {
+      Log.Info("SELL FINISHED");
+      await Task.CompletedTask;
+      lock (locker) {
+        Quantity -= sellOrder.Quantity;
+        Quantity = Quantity.RoundDown(Market.AssetPrecision);
+        Commission += sellOrder.Amount * CommissionFee;
+        Revenue += sellOrder.Amount;
+        this.buyOrder = null;
+        this.sellOrder = null;
+        ProfitCalculator.Add(Revenue - Commission);
+        ProfitCalculator.PrintStats();
+        Revenue = 0m;
+        Commission = 0m;
+        State = PrepareBuy;
+      }
+    }
+    /*
     public override async Task OnBuy(Order order) {
       var lastFill = order.Fills.LastOrDefault();
       if(lastFill != null) {
@@ -126,6 +212,6 @@ namespace PiTrade.Strategy {
           Commission = 0m;
         }
       }
-    }
+    }*/
   }
 }

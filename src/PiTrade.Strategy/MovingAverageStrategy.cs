@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace PiTrade.Strategy {
+  /*
   public class MovingAverageStrategy : IOrderListener {
     #region Properties
     private readonly IMarket Market;
@@ -243,5 +244,5 @@ namespace PiTrade.Strategy {
     }
 
     
-  }
+  }*/
 }
