@@ -30,7 +30,7 @@ namespace PiTrade.Exchange.Util {
       var candles = FetchCandles();
 
       // update indicators
-      foreach (var indicator in indicators)
+      if(candles.Any()) foreach (var indicator in indicators)
         await indicator.Update(candles.ToArray());
 
       // update periods and lastPrice
