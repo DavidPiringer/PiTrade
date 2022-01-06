@@ -34,9 +34,9 @@ namespace PiTrade.Exchange {
 
     void AddIndicator(IIndicator indicator);
 
-    Task<(Order? order, ErrorType error)> CreateMarketOrder(OrderSide side, decimal quantity);
+    Task<(Order? order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity);
 
-    Task<(Order? order, ErrorType error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+    Task<(Order? order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
 
     //IMarketHandle GetMarketHandle(out Task awaitTask, IOrderListener? listener = null);
   }

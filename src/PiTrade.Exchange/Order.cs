@@ -56,7 +56,7 @@ namespace PiTrade.Exchange {
 
     public async Task Cancel() {
       if (!IsFilled && !IsCancelled) {
-        await ExponentialBackoff.Try(async () => ErrorType.ConnectionLost == await Market.CancelOrder(this));
+        await ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
         IsCancelled = true;
       }
     }

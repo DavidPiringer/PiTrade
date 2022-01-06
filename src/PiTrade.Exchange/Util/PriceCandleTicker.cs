@@ -1,40 +1,41 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange.Entities;
+using PiTrade.Exchange.Indicators;
 
 namespace PiTrade.Exchange.Util {
-  internal class PriceCandleTicker {
+  internal sealed class PriceCandleTicker {
+    private readonly object locker = new object();
     private readonly TimeSpan Period;
+    private readonly ConcurrentBag<IIndicator> indicators = new ConcurrentBag<IIndicator>();
+    private readonly ConcurrentBag<decimal> currentPeriod = new ConcurrentBag<decimal>();
 
     private DateTime lastPeriod = DateTime.Now;
-    private IList<decimal> currentPeriod = new List<decimal>();
-
-    public event Action<PriceCandle>? Tick;
 
     public PriceCandleTicker(TimeSpan updatePeriod) {
       this.Period = updatePeriod;
     }
 
-    public void PriceUpdate(decimal price) {
-      var lastPrice = currentPeriod.LastOrDefault(price);
+    public void Listen(IIndicator indicator) => indicators.Add(indicator);
+
+    public async Task PriceUpdate(decimal price) {
       while (lastPeriod.Add(Period).CompareTo(DateTime.Now) <= 0) {
-        if (currentPeriod.Count > 0) { // add last active candle
-          Tick?.Invoke(new PriceCandle(currentPeriod.ToArray(), Period));
+        // update indicators
+        foreach (var indicator in indicators)
+          await indicator.Update(new PriceCandle(currentPeriod.ToArray(), Period));
+        if (currentPeriod.Count > 0)
           currentPeriod.Clear();
-        } else { // add inactive candles
-          Tick?.Invoke(new PriceCandle(new decimal[] { lastPrice }, Period));
-        }
         lastPeriod = lastPeriod.Add(Period);
       }
-      if(lastPeriod.Add(Period).CompareTo(DateTime.Now) < 0) {
-        lastPeriod = DateTime.Now;
+      lock(locker) { 
+        if(lastPeriod.Add(Period).CompareTo(DateTime.Now) < 0)
+          lastPeriod = DateTime.Now;
       }
-
       currentPeriod.Add(price);
-
     }
   }
 }

@@ -7,12 +7,10 @@ using PiTrade.Exchange.Entities;
 
 namespace PiTrade.Exchange.Indicators {
   public interface IIndicator {
-    bool IsReady { get; }
     TimeSpan Period { get; }
     decimal Value { get; }
     double Slope { get; }
-    void Update(PriceCandle value);
-    void Register(Func<IIndicator, Task> fnc);
-    void Unregister(Func<IIndicator, Task> fnc);
+    Task Update(PriceCandle value);
+    void Listen(Func<IIndicator, Task> fnc);
   }
 }

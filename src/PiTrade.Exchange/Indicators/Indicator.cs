@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,9 +10,10 @@ using PiTrade.Logging;
 
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
+    private readonly object locker = new object();
+    private readonly ConcurrentBag<Func<IIndicator, Task>> listeners = new ConcurrentBag<Func<IIndicator, Task>>();
     protected readonly IndicatorValueType valueType;
     protected readonly int maxTicks;
-    protected readonly IList<Func<IIndicator, Task>> listeners = new List<Func<IIndicator, Task>>();
 
     private int Tick { get; set; } = 0;
     private bool IsReady => Tick >= maxTicks;
@@ -25,37 +27,39 @@ namespace PiTrade.Exchange.Indicators {
       this.maxTicks = maxTicks;
     }
 
-    public void Update(PriceCandle candle) {
+    public async Task Update(PriceCandle candle) {
       if(candle.Period.CompareTo(Period) == 0) {
-        var tmp = Value;
-        Value = Tick == 0 ? candle.Average : Calculate(Aggregate(candle));
-        var diff = (double)(Value - tmp);
-        Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
-        Tick = IsReady ? Tick : Tick + 1;
-
+        var isReady = false;
+        lock(locker) { 
+          var tmp = Value;
+          Value = Tick == 0 ? candle.Average : Calculate(Aggregate(candle));
+          var diff = (double)(Value - tmp);
+          Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
+          Tick = IsReady ? Tick : Tick + 1;
+          isReady = IsReady;
+        }
         // update listeners
-        if (IsReady)
+        if (isReady)
           foreach (var listener in listeners)
-            listener(this);
+            await listener(this);
       } else {
-        Log.Error($"Candle has not the same period as referenced ticker.");
+        Log.Error($"Candle has not the same period as referenced indicator.");
       }
     }
 
-    void Register(Func<IIndicator, Task> fnc) => listeners.Add(fnc);
-    void Unregister(Func<IIndicator, Task> fnc) => listeners.Remove(fnc);
+    public void Listen(Func<IIndicator, Task> fnc) => listeners.Add(fnc);
 
     protected abstract decimal Calculate(decimal value);
 
-    private decimal Aggregate(PriceCandle candle) {
-      switch (valueType) {
-        case IndicatorValueType.Average: return candle.Average;
-        case IndicatorValueType.Open: return candle.Open;
-        case IndicatorValueType.Close: return candle.Close;
-        case IndicatorValueType.Min: return candle.Min;
-        case IndicatorValueType.Max: return candle.Max;
-        default: return candle.Average;
-      }
-    }
+    private decimal Aggregate(PriceCandle candle) =>
+      valueType switch {
+        IndicatorValueType.Average => candle.Average,
+        IndicatorValueType.Open => candle.Open,
+        IndicatorValueType.Close => candle.Close,
+        IndicatorValueType.Min => candle.Min,
+        IndicatorValueType.Max => candle.Max,
+        _ => candle.Average
+      };
+    
   }
 }

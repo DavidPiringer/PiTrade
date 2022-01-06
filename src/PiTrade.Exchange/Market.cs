@@ -11,7 +11,7 @@ namespace PiTrade.Exchange {
   public abstract class Market : IMarket {
     private readonly object locker = new object();
     private readonly IDictionary<long, PriceCandleTicker> priceCandleTickers = new Dictionary<long, PriceCandleTicker>();
-    private readonly ConcurrentBag<IIndicator> indicators = new ConcurrentBag<IIndicator>();
+    private readonly IList<IIndicator> indicators = new List<IIndicator>();
     private readonly IList<Order> openOrders = new List<Order>();
 
     public IExchange Exchange { get; }
@@ -43,14 +43,14 @@ namespace PiTrade.Exchange {
         priceCandleTickers.Add(key, ticker);
       }
       if (ticker != null) {
-        ticker.Tick += indicator.Update;
+        ticker.Listen(indicator);
         indicators.Add(indicator);
       }
     }
         
 
-    public abstract Task<(Order? order, ErrorType error)> CreateMarketOrder(OrderSide side, decimal quantity);
-    public abstract Task<(Order? order, ErrorType error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+    public abstract Task<(Order? order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity);
+    public abstract Task<(Order? order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
 
     public Task Connect() {
       if (MarketLoop == null) {
@@ -68,10 +68,7 @@ namespace PiTrade.Exchange {
     /// </summary>
     internal void RegisterOrder(Order order) => openOrders.Add(order);
 
-    //protected internal abstract Task<Order> MarketOrder(OrderSide side, decimal quantity);
-    //protected internal abstract Task<Order> NewOrder(OrderSide side, decimal price, decimal quantity);
-    //protected internal abstract Task<Order> StopLossOrder(OrderSide side, decimal stopPrice, decimal quantity);
-    protected internal abstract Task<ErrorType> CancelOrder(Order order);
+    protected internal abstract Task<ErrorState> CancelOrder(Order order);
     protected abstract Task InitMarketLoop();
     protected abstract Task<ITradeUpdate?> MarketLoopCycle(CancellationToken token);
     protected abstract Task ExitMarketLoop();
@@ -95,7 +92,7 @@ namespace PiTrade.Exchange {
             if (CurrentPrice != update.Price) {
               // update indicators
               foreach (var ticker in priceCandleTickers.Values)
-                ticker.PriceUpdate(update.Price);
+                ticker.PriceUpdate(update.Price).Wait();
 
               lock (locker) CurrentPrice = update.Price;
             }

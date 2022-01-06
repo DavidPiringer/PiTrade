@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace PiTrade.Exchange.Enums {
-  public enum ErrorType {
+  public enum ErrorState {
     ConnectionLost,
     MinNominalUndershot,
     IdNotFound,

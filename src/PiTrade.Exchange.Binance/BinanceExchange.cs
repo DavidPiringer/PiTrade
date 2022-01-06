@@ -85,7 +85,7 @@ namespace PiTrade.Exchange.Binance {
     #endregion
 
     #region Internal Methods
-    internal async Task<(Order? order, ErrorType error)> NewMarketOrder(Market market, OrderSide side, decimal quantity) {
+    internal async Task<(Order? order, ErrorState error)> NewMarketOrder(Market market, OrderSide side, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -94,11 +94,11 @@ namespace PiTrade.Exchange.Binance {
         {"quantity", quantity}
       });
       if (response == null || response.Id == -1)
-        return (null, ErrorType.IdNotFound);
-      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorType.None);
+        return (null, ErrorState.IdNotFound);
+      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorState.None);
     }
 
-    internal async Task<(Order? order, ErrorType error)> NewLimitOrder(Market market, OrderSide side, decimal price, decimal quantity) {
+    internal async Task<(Order? order, ErrorState error)> NewLimitOrder(Market market, OrderSide side, decimal price, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -109,16 +109,16 @@ namespace PiTrade.Exchange.Binance {
         {"price", price}
       });
       if (response == null || response.Id == -1)
-        return (null, ErrorType.IdNotFound);
-      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorType.None);
+        return (null, ErrorState.IdNotFound);
+      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorState.None);
     }
 
 
-    internal async Task<ErrorType> Cancel(Order order) =>
+    internal async Task<ErrorState> Cancel(Order order) =>
       await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
         { {"symbol", MarketString(order.Market) },
         {"orderId", order.Id.ToString()} }) == null ? 
-      ErrorType.ConnectionLost : ErrorType.None;
+      ErrorState.ConnectionLost : ErrorState.None;
 
 
     internal Task CancelAll(IMarket market) =>
