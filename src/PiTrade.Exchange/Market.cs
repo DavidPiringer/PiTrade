@@ -47,10 +47,15 @@ namespace PiTrade.Exchange {
         indicators.Add(indicator);
       }
     }
-        
 
-    public abstract Task<(Order? order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity);
-    public abstract Task<(Order? order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+
+    public Task<(Order? order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity) =>
+      NewMarketOrder(side, quantity.RoundDown(AssetPrecision));
+    public abstract Task<(Order? order, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity);
+
+    public  Task<(Order? order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity) =>
+      NewLimitOrder(side, price.RoundDown(QuotePrecision), quantity.RoundUp(AssetPrecision));
+    public abstract Task<(Order? order, ErrorState error)> NewLimitOrder(OrderSide side, decimal price, decimal quantity);
 
     public Task Connect() {
       if (MarketLoop == null) {

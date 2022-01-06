@@ -26,10 +26,10 @@ namespace PiTrade.Exchange.Binance {
       uri = new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade");
     }
 
-    public override Task<(Order? order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity) =>
+    public override Task<(Order? order, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity) =>
       Exchange.NewMarketOrder(this, side, quantity);
 
-    public override Task<(Order? order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity) =>
+    public override Task<(Order? order, ErrorState error)> NewLimitOrder(OrderSide side, decimal price, decimal quantity) =>
       Exchange.NewLimitOrder(this, side, price, quantity);
 
     protected async override Task<ErrorState> CancelOrder(Order order) =>
