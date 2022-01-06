@@ -13,6 +13,7 @@ namespace PiTrade.Exchange {
   public class Order : IDisposable {
     private readonly object locker = new object();
     private readonly TaskCompletionSource fillTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly CancellationTokenSource CTS = new CancellationTokenSource();
 
     private decimal summedPriceFills = 0m;
     private int fillCount = 0;
@@ -26,7 +27,7 @@ namespace PiTrade.Exchange {
     public decimal ExecutedAmount => AvgFillPrice * ExecutedQuantity;
     public decimal ExecutedQuantity { get; private set; }
     public bool IsFilled => Quantity <= ExecutedQuantity;
-    public bool IsCancelled { get; private set; }
+    public bool IsCancelled => CTS.IsCancellationRequested;
     public decimal AvgFillPrice {
       get {
         lock (locker) { return summedPriceFills / fillCount; }
@@ -40,7 +41,6 @@ namespace PiTrade.Exchange {
       Side = side;
       TargetPrice = targetPrice;
       Quantity = quantity;
-      IsCancelled = false;
       market.RegisterOrder(this);
     }
 
@@ -57,9 +57,9 @@ namespace PiTrade.Exchange {
     }
 
     public async Task Cancel() {
-      if (!IsFilled && !IsCancelled) {
+      if (!IsFilled && !CTS.IsCancellationRequested) {
         await ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
-        IsCancelled = true;
+        CTS.Cancel();
       }
     }
 
@@ -77,8 +77,9 @@ namespace PiTrade.Exchange {
     public void WhenFilled(Func<Order, Task> fnc) =>
       Task.Factory.StartNew(async () => {
         await fillTCS.Task;
-        await fnc.Invoke(this);
-      }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        if(!CTS.Token.IsCancellationRequested)
+          await fnc.Invoke(this);
+      }, CTS.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     public override string ToString() =>
       $"Id = {Id}, " +
