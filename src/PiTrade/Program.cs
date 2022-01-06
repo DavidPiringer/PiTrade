@@ -30,7 +30,7 @@ var tasks = new List<Task>();
 
 
 //tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 400m, 40m, 0.9m));
-tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 40m));
+tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 11m));
 //tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 400m, 40m, 0.96m));
 //tasks.Add(Start(exchange.GetMarket(Symbol.SAND, Symbol.USDT), 200m, 10m, 0.96m));
 //tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 700m, 35m, 0.96m));

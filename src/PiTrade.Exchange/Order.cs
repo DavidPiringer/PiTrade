@@ -6,12 +6,13 @@ using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
+using PiTrade.Logging;
 using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public class Order : IDisposable {
     private readonly object locker = new object();
-    private readonly TaskCompletionSource fillTCS = new TaskCompletionSource();
+    private readonly TaskCompletionSource fillTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private decimal summedPriceFills = 0m;
     private int fillCount = 0;
@@ -39,6 +40,7 @@ namespace PiTrade.Exchange {
       Side = side;
       TargetPrice = targetPrice;
       Quantity = quantity;
+      IsCancelled = false;
       market.RegisterOrder(this);
     }
 
@@ -61,10 +63,22 @@ namespace PiTrade.Exchange {
       }
     }
 
-    public async Task WhenFilled(Func<Order, Task> fnc) {
-      await fillTCS.Task;
-      await fnc.Invoke(this);
-    }
+    /// <summary>
+    /// Starts a new long running task, which waits for the full execution of the order.
+    /// After the order is filled, it continues with a defined function.
+    /// </summary>
+    public void WhenFilled(Action<Order> fnc) =>
+      WhenFilled(o => Task.Run(() => fnc(o)));
+
+    /// <summary>
+    /// Starts a new long running task, which waits for the full execution of the order.
+    /// After the order is filled, it continues with a defined function.
+    /// </summary>
+    public void WhenFilled(Func<Order, Task> fnc) =>
+      Task.Factory.StartNew(async () => {
+        await fillTCS.Task;
+        await fnc.Invoke(this);
+      }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     public override string ToString() =>
       $"Id = {Id}, " +

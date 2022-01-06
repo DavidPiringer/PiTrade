@@ -10,7 +10,7 @@ namespace PiTrade.Exchange.Indicators {
     TimeSpan Period { get; }
     decimal Value { get; }
     double Slope { get; }
-    Task Update(PriceCandle value);
+    Task Update(params PriceCandle[] candles);
     void Listen(Func<IIndicator, Task> fnc);
   }
 }

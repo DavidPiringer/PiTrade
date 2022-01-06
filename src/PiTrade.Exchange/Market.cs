@@ -79,11 +79,11 @@ namespace PiTrade.Exchange {
     protected abstract Task ExitMarketLoop();
 
 
-    private Task CreateMarketLoop(CancellationToken token) =>
-      Task.Factory.StartNew(() => {
-        InitMarketLoop().Wait();
+    private Task CreateMarketLoop(CancellationToken token) { 
+      var task = Task.Factory.StartNew(async () => {
+        await InitMarketLoop();
         while (!token.IsCancellationRequested) {
-          var update = MarketLoopCycle(token).GetAwaiter().GetResult();
+          var update = await MarketLoopCycle(token);
           if (update != null) {
             // update open orders
             foreach (var order in openOrders.ToArray()) {
@@ -103,8 +103,11 @@ namespace PiTrade.Exchange {
             }
           }
         }
-        ExitMarketLoop().Wait();
+        await ExitMarketLoop();
       }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+      task.Wait();
+      return task.Result;
+    }
 
   }
 }

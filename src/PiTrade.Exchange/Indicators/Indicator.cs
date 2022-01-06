@@ -17,7 +17,7 @@ namespace PiTrade.Exchange.Indicators {
 
     private int Tick { get; set; } = 0;
     private bool IsReady => Tick >= maxTicks;
-    public TimeSpan Period { get; private set; }    
+    public TimeSpan Period { get; private set; }
     public decimal Value { get; private set; }
     public double Slope { get; private set; }
 
@@ -27,24 +27,13 @@ namespace PiTrade.Exchange.Indicators {
       this.maxTicks = maxTicks;
     }
 
-    public async Task Update(PriceCandle candle) {
-      if(candle.Period.CompareTo(Period) == 0) {
-        var isReady = false;
-        lock(locker) { 
-          var tmp = Value;
-          Value = Tick == 0 ? candle.Average : Calculate(Aggregate(candle));
-          var diff = (double)(Value - tmp);
-          Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
-          Tick = IsReady ? Tick : Tick + 1;
-          isReady = IsReady;
-        }
-        // update listeners
-        if (isReady)
-          foreach (var listener in listeners)
-            await listener(this);
-      } else {
-        Log.Error($"Candle has not the same period as referenced indicator.");
-      }
+    public async Task Update(params PriceCandle[] candles) {
+      foreach (var candle in candles)
+        AddCandle(candle);
+
+      // update listeners
+      if (IsReady) foreach (var listener in listeners)
+        await listener(this);
     }
 
     public void Listen(Func<IIndicator, Task> fnc) => listeners.Add(fnc);
@@ -60,6 +49,19 @@ namespace PiTrade.Exchange.Indicators {
         IndicatorValueType.Max => candle.Max,
         _ => candle.Average
       };
-    
+
+    private void AddCandle(PriceCandle candle) {
+      if (candle.Period.CompareTo(Period) == 0) {
+        lock (locker) {
+          var tmp = Value;
+          Value = Tick == 0 ? candle.Average : Calculate(Aggregate(candle));
+          var diff = (double)(Value - tmp);
+          Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
+          Tick = IsReady ? Tick : Tick + 1;
+        }
+      } else {
+        Log.Error($"Candle has not the same period as referenced indicator.");
+      }
+    }
   }
 }
