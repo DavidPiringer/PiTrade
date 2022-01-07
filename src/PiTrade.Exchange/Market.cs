@@ -53,7 +53,7 @@ namespace PiTrade.Exchange {
       NewMarketOrder(side, quantity.RoundDown(AssetPrecision));
     public abstract Task<(Order? order, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity);
 
-    public  Task<(Order? order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity) =>
+    public Task<(Order? order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity) =>
       NewLimitOrder(side, price.RoundDown(QuotePrecision), quantity.RoundUp(AssetPrecision));
     public abstract Task<(Order? order, ErrorState error)> NewLimitOrder(OrderSide side, decimal price, decimal quantity);
 
@@ -71,7 +71,9 @@ namespace PiTrade.Exchange {
     /// With this 'trick' it is possible to use the interface signature for child market 
     /// types and still have a reference to all created orders.
     /// </summary>
-    internal void RegisterOrder(Order order) => openOrders.Add(order);
+    internal void RegisterOrder(Order order) {
+      lock (locker) openOrders.Add(order); 
+    }
 
     protected internal abstract Task<ErrorState> CancelOrder(Order order);
     protected abstract Task InitMarketLoop();
@@ -85,21 +87,20 @@ namespace PiTrade.Exchange {
         while (!token.IsCancellationRequested) {
           var update = await MarketLoopCycle(token);
           if (update != null) {
+            // update only if price has changed
+            if (CurrentPrice != update.Price) {
+              lock (locker) CurrentPrice = update.Price;
+              // update indicators
+              foreach (var ticker in priceCandleTickers.Values)
+                ticker.PriceUpdate(update.Price).Wait();
+            }
+
             // update open orders
             foreach (var order in openOrders.ToArray()) {
               order.Update(update);
               // remove filled or cancelled orders
               if (order.IsFilled || order.IsCancelled) 
-                openOrders.Remove(order);
-            }
-
-            // update only if price has changed
-            if (CurrentPrice != update.Price) {
-              // update indicators
-              foreach (var ticker in priceCandleTickers.Values)
-                ticker.PriceUpdate(update.Price).Wait();
-
-              lock (locker) CurrentPrice = update.Price;
+                lock(locker) openOrders.Remove(order);
             }
           }
         }
