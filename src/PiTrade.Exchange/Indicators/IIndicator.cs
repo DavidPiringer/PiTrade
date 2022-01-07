@@ -8,6 +8,7 @@ using PiTrade.Exchange.Entities;
 namespace PiTrade.Exchange.Indicators {
   public interface IIndicator {
     TimeSpan Period { get; }
+    bool IsReady { get; }
     decimal Value { get; }
     double Slope { get; }
     Task Update(params PriceCandle[] candles);

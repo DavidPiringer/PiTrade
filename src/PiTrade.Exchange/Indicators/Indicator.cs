@@ -16,7 +16,7 @@ namespace PiTrade.Exchange.Indicators {
     protected readonly int maxTicks;
 
     private int Tick { get; set; } = 0;
-    private bool IsReady => Tick >= maxTicks;
+    public bool IsReady => Tick >= maxTicks;
     public TimeSpan Period { get; private set; }
     public decimal Value { get; private set; }
     public double Slope { get; private set; }
