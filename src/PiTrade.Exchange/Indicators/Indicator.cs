@@ -11,7 +11,6 @@ using PiTrade.Logging;
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
     private readonly object locker = new object();
-    private readonly ConcurrentBag<Func<IIndicator, Task>> listeners = new ConcurrentBag<Func<IIndicator, Task>>();
     protected readonly IndicatorValueType valueType;
     protected readonly int maxTicks;
 
@@ -27,16 +26,11 @@ namespace PiTrade.Exchange.Indicators {
       this.maxTicks = maxTicks;
     }
 
-    public async Task Update(params PriceCandle[] candles) {
+    public void Update(params PriceCandle[] candles) {
       foreach (var candle in candles)
         AddCandle(candle);
-
-      // update listeners
-      if (IsReady) foreach (var listener in listeners)
-        await listener(this);
     }
 
-    public void Listen(Func<IIndicator, Task> fnc) => listeners.Add(fnc);
 
     protected abstract decimal Calculate(decimal value);
 

@@ -13,6 +13,7 @@ namespace PiTrade.Exchange {
     private readonly IDictionary<long, PriceCandleTicker> priceCandleTickers = new Dictionary<long, PriceCandleTicker>();
     private readonly IList<IIndicator> indicators = new List<IIndicator>();
     private readonly IList<Order> openOrders = new List<Order>();
+    private readonly IList<Func<decimal, Task>> listeners = new List<Func<decimal, Task>>();
 
     public IExchange Exchange { get; }
     public Symbol Asset { get; }
@@ -43,10 +44,12 @@ namespace PiTrade.Exchange {
         priceCandleTickers.Add(key, ticker);
       }
       if (ticker != null) {
-        ticker.Listen(indicator);
+        ticker.AddIndicator(indicator);
         indicators.Add(indicator);
       }
     }
+
+    public void Listen(Func<decimal, Task> fnc) => listeners.Add(fnc);
 
 
     public Task<(Order? order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity) =>
@@ -92,7 +95,10 @@ namespace PiTrade.Exchange {
               lock (locker) CurrentPrice = update.Price;
               // update indicators
               foreach (var ticker in priceCandleTickers.Values)
-                ticker.PriceUpdate(update.Price).Wait();
+                ticker.PriceUpdate(update.Price);
+              // notify listeners
+              foreach (var listener in listeners)
+                await listener(update.Price);
             }
 
             // update open orders

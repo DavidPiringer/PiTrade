@@ -12,6 +12,5 @@ namespace PiTrade.Exchange.Indicators {
     decimal Value { get; }
     double Slope { get; }
     Task Update(params PriceCandle[] candles);
-    void Listen(Func<IIndicator, Task> fnc);
   }
 }

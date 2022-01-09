@@ -21,9 +21,9 @@ namespace PiTrade.Exchange.Util {
       this.Period = updatePeriod;
     }
 
-    public void Listen(IIndicator indicator) => indicators.Add(indicator);
+    public void AddIndicator(IIndicator indicator) => indicators.Add(indicator);
 
-    public async Task PriceUpdate(decimal price) {
+    public void PriceUpdate(decimal price) {
       // set lastPrice to price for initialization
       if(lastPrice == decimal.MinValue) lastPrice = price;
 
@@ -31,7 +31,7 @@ namespace PiTrade.Exchange.Util {
 
       // update indicators
       if(candles.Any()) foreach (var indicator in indicators)
-        await indicator.Update(candles.ToArray());
+        indicator.Update(candles.ToArray());
 
       // update periods and lastPrice
       lock (locker) { 
