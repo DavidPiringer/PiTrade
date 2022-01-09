@@ -15,11 +15,10 @@ using PiTrade.Strategy.Util;
 namespace PiTrade.Strategy {
   public class WaveSurferStrategy : Stategy {
     private const decimal CommissionFee = 0.00075m;
-    private const decimal UpperThreshold = 0.0016m;
-    private const decimal LowerThreshold = 0.0025m;
+    private const decimal UpperThreshold = 0.002m;
+    private const decimal LowerThreshold = 0.01m;
 
-    private readonly IIndicator ema5T36;
-    private readonly IIndicator ema5T120;
+    private readonly IEnumerable<IIndicator> indicators;
     private readonly decimal allowedQuote;
     private readonly object locker = new object();
 
@@ -29,39 +28,42 @@ namespace PiTrade.Strategy {
     private decimal Quantity { get; set; } = 0m;
     private decimal Commission { get; set; } = 0m;
     private decimal Revenue { get; set; } = 0m;
-    private bool IsSelling { get; set; } = false;
 
-    private double IndicatorSlopeShort { get; set; } = -1;
-    private double IndicatorSlopeLong { get; set; } = -1;
 
     private Func<Task>? State { get; set; }
 
 
     public WaveSurferStrategy(IMarket market, decimal allowedQuote, bool respendMoney) : base(market) {
       State = PrepareBuy;
-      ema5T36 = new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 36);
-      ema5T120 = new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 120);
-      market.AddIndicator(ema5T36);
-      market.AddIndicator(ema5T120);
-      ema5T36.Listen(DoWorkEMA5T36);
-      ema5T120.Listen(DoWorkEMA5T120);
+
+      indicators = new IIndicator[] {
+        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 12),  // 1min
+        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 120), // 10min
+        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 300)  // 25min
+      };
+
+      foreach(var indicator in indicators)
+        market.AddIndicator(indicator);
+
+      market.Listen(MarketListener);
       this.allowedQuote = allowedQuote;
     } // TODO: add max. quote to fail for
 
-    private async Task DoWorkEMA5T36(IIndicator indicator) {
-      lock(locker) IndicatorSlopeShort = indicator.Slope;
-      Log.Info($"{IndicatorSlopeShort} - {IndicatorSlopeLong}");
+
+
+
+    // TODO: add PiTrade.EventHandling -> convinient stuff for events
+
+    private async Task MarketListener(decimal price) {
       if (State != null) await State();
-    }
-    private async Task DoWorkEMA5T120(IIndicator indicator) {
-      lock (locker) IndicatorSlopeLong = indicator.Slope;
-      await Task.CompletedTask;
+      else Log.Info("STATE = null");
     }
 
     private async Task PrepareBuy() {
+      Log.Info("STATE = PrepareBuy");
       if (buyOrder != null) return;
 
-      if (IndicatorSlopeShort > 0 && IndicatorSlopeLong > 0) {
+      if (indicators.All(x => x.Slope > 0)) {
         State = null;
         var price = Market.CurrentPrice;
         var quantity = allowedQuote / price;
@@ -71,34 +73,34 @@ namespace PiTrade.Strategy {
           this.buyOrder = order;
           order.WhenFilled(BuyFinished);
         } else {
-          Log.Warn($"Error for BUY -> {error}");
+          Log.Error($"Error for BUY -> {error}");
         }
       }
     }
 
     private async Task PrepareSell() {
+      Log.Info("STATE = PrepareSell");
       if (sellOrder != null) return;
-
-      if (buyOrder != null && (IndicatorSlopeShort < 0 || IndicatorSlopeLong < 0)) {
-        State = null;
-
+      //TODO: add indicator listen to market -> market gives indicator array and current price
+      if (buyOrder != null && indicators.Any(x => x.Slope < 0)) {
         var price = Market.CurrentPrice;
         if (price > buyOrder.AvgFillPrice * (1m + UpperThreshold) ||
             price < buyOrder.AvgFillPrice * (1m - LowerThreshold)) {
+          State = null;
           Log.Info("SELL");
           (Order? order, ErrorState error) = await Market.CreateMarketOrder(OrderSide.SELL, buyOrder.Quantity);
           if (error == ErrorState.None && order != null) {
             this.sellOrder = order;
             order.WhenFilled(SellFinished);
           } else {
-            Log.Warn($"Error for SELL -> {error}");
+            Log.Error($"Error for SELL -> {error}");
           }
         }
       }
     }
 
     private void BuyFinished(Order buyOrder) {
-      Log.Info("BUY FINISHED");
+      Log.Info("STATE = BuyFinished");
       lock (locker) {
         Quantity += buyOrder.Quantity;
         Quantity = Quantity.RoundDown(Market.AssetPrecision);
@@ -109,7 +111,7 @@ namespace PiTrade.Strategy {
     }
 
     private void SellFinished(Order sellOrder) {
-      Log.Info("SELL FINISHED");
+      Log.Info("STATE = SellFinished");
       lock (locker) {
         Quantity -= sellOrder.Quantity;
         Quantity = Quantity.RoundDown(Market.AssetPrecision);
