@@ -28,6 +28,9 @@ namespace PiTrade.Strategy {
     private decimal Quantity { get; set; } = 0m;
     private decimal Commission { get; set; } = 0m;
     private decimal Revenue { get; set; } = 0m;
+    private bool AllIndicatorsReady => indicators.All(x => x.IsReady);
+    private bool AllIndicatorsPositive => indicators.All(x => x.Slope > 0);
+    private bool AnyIndicatorsNegative => indicators.Any(x => x.Slope < 0);
 
 
     private Func<Task>? State { get; set; }
@@ -55,7 +58,8 @@ namespace PiTrade.Strategy {
     // TODO: add PiTrade.EventHandling -> convinient stuff for events
 
     private async Task MarketListener(decimal price) {
-      if (State != null) await State();
+      if (State != null && AllIndicatorsReady) 
+        await State();
       else Log.Info("STATE = null");
     }
 
@@ -63,7 +67,7 @@ namespace PiTrade.Strategy {
       Log.Info("STATE = PrepareBuy");
       if (buyOrder != null) return;
 
-      if (indicators.All(x => x.Slope > 0)) {
+      if (AllIndicatorsPositive) {
         State = null;
         var price = Market.CurrentPrice;
         var quantity = allowedQuote / price;
@@ -82,7 +86,7 @@ namespace PiTrade.Strategy {
       Log.Info("STATE = PrepareSell");
       if (sellOrder != null) return;
       //TODO: add indicator listen to market -> market gives indicator array and current price
-      if (buyOrder != null && indicators.Any(x => x.Slope < 0)) {
+      if (buyOrder != null && AnyIndicatorsNegative) {
         var price = Market.CurrentPrice;
         if (price > buyOrder.AvgFillPrice * (1m + UpperThreshold) ||
             price < buyOrder.AvgFillPrice * (1m - LowerThreshold)) {
