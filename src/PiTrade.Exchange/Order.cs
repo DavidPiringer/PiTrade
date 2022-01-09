@@ -23,16 +23,12 @@ namespace PiTrade.Exchange {
     public OrderSide Side { get; }
     public decimal TargetPrice { get; }
     public decimal Quantity { get; }
-    public decimal Amount => AvgFillPrice * Quantity;
-    public decimal ExecutedAmount => AvgFillPrice * ExecutedQuantity;
+    public decimal Amount { get; private set; }
+    public decimal ExecutedAmount { get; private set; }
     public decimal ExecutedQuantity { get; private set; }
-    public bool IsFilled => Quantity <= ExecutedQuantity;
+    public decimal AvgFillPrice { get; private set; }
+    public bool IsFilled { get; private set; }
     public bool IsCancelled => CTS.IsCancellationRequested;
-    public decimal AvgFillPrice {
-      get {
-        lock (locker) { return summedPriceFills / fillCount; }
-      }
-    }
 
 
     public Order(long id, Market market, OrderSide side, decimal targetPrice, decimal quantity) {
@@ -47,10 +43,17 @@ namespace PiTrade.Exchange {
 
     internal void Update(ITradeUpdate update) {
       if (update.Match(this)) {
+        // set all property values in a locked environment
+        // set the values instead of calculating them in their getter
+        // -> prevents race conditions
         lock (locker) {
           ExecutedQuantity += update.Quantity;
           summedPriceFills += update.Price;
           fillCount++;
+          AvgFillPrice = summedPriceFills / fillCount;
+          ExecutedAmount = AvgFillPrice * ExecutedQuantity;
+          Amount = AvgFillPrice * Quantity;
+          IsFilled = Quantity <= ExecutedQuantity;
           if (IsFilled) fillTCS.SetResult();
         }
       }
