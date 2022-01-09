@@ -107,6 +107,7 @@ namespace PiTrade.Strategy {
       Log.Info("STATE = SellFinished");
       AddFilledOrder(sellOrder);
       Reset();
+      PrintStatus();
       State = PrepareBuy;
     }
 

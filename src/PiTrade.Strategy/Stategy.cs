@@ -15,8 +15,8 @@ namespace PiTrade.Strategy {
 
     protected IMarket Market { get; }
     protected decimal Quantity { get; private set; }
+    protected decimal Revenue { get; private set; }
     protected static decimal Commission { get; private set; }
-    protected static decimal Revenue { get; private set; }
 
 
     private static readonly object locker = new object();
@@ -41,7 +41,6 @@ namespace PiTrade.Strategy {
             Revenue += order.Amount;
             Quantity -= order.Quantity;
             Profit += Revenue - Commission;
-            Log.Info($"Profit = {Profit}");
           }
           Quantity = Quantity.RoundDown(Market.AssetPrecision);
         }
@@ -53,6 +52,11 @@ namespace PiTrade.Strategy {
         Quantity = 0;
         Revenue = 0;
       }
+    }
+
+    protected virtual void PrintStatus() {
+      Log.Info($"Profit = {Profit}");
+      Log.Info($"Commission = {Commission}");
     }
   }
 }
