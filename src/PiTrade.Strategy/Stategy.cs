@@ -17,8 +17,8 @@ namespace PiTrade.Strategy {
     protected const decimal CommissionFee = 0.00075m;
 
     protected IMarket Market { get; }
-    protected decimal Expenses { get; private set; }
-    protected decimal Returns { get; private set; }
+    protected static decimal Expenses { get; private set; }
+    protected static decimal Returns { get; private set; }
     protected static decimal Commission { get; private set; }
 
 
@@ -48,6 +48,11 @@ namespace PiTrade.Strategy {
           else if (order.Side == OrderSide.SELL)
             Returns += order.Amount;
           Profit = Returns - Expenses - Commission;
+
+          if (Profit < -10) {
+            Log.Error("Closing Application because of great losses.");
+            Environment.Exit(-1);
+          }
         }
       }
 
@@ -57,9 +62,7 @@ namespace PiTrade.Strategy {
       }
     }
 
-    protected virtual void Reset() {
-
-    }
+    protected virtual void Reset() { }
 
     protected virtual void PrintStatus() {
       Log.Info($"Profit = {Profit}");
