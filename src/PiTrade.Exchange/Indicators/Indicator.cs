@@ -11,6 +11,7 @@ using PiTrade.Logging;
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
     private readonly object locker = new object();
+    private readonly bool simulateWithFirstUpdate = false;
     protected readonly IndicatorValueType valueType;
     protected readonly int maxTicks;
 
@@ -20,15 +21,18 @@ namespace PiTrade.Exchange.Indicators {
     public decimal Value { get; private set; }
     public double Slope { get; private set; }
 
-    public Indicator(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
+    public Indicator(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close, bool simulateWithFirstUpdate = false) {
       Period = period;
       valueType = indicatorValueType;
       this.maxTicks = maxTicks;
+      this.simulateWithFirstUpdate = simulateWithFirstUpdate;
     }
 
     public void Update(params PriceCandle[] candles) {
       foreach (var candle in candles)
         AddCandle(candle);
+      if (simulateWithFirstUpdate && candles.Any())
+        Simulate(candles.Last());
     }
 
 
@@ -43,6 +47,11 @@ namespace PiTrade.Exchange.Indicators {
         IndicatorValueType.Max => candle.Max,
         _ => candle.Average
       };
+
+    private void Simulate(PriceCandle candle) { 
+      while(!IsReady) AddCandle(candle);
+    }
+
 
     private void AddCandle(PriceCandle candle) {
       if (candle.Period.CompareTo(Period) == 0) {

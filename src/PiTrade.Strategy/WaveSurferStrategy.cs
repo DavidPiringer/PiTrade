@@ -15,7 +15,7 @@ using PiTrade.Strategy.Util;
 namespace PiTrade.Strategy {
   public class WaveSurferStrategy : Stategy {
     private const decimal UpperThreshold = 0.002m;
-    private const decimal LowerThreshold = 0.01m;
+    private const decimal LowerThreshold = 0.002m;
 
     private readonly IEnumerable<IIndicator> indicators;
     private readonly decimal allowedQuote;
@@ -35,9 +35,9 @@ namespace PiTrade.Strategy {
       State = PrepareBuy;
 
       indicators = new IIndicator[] {
-        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 12),  // 1min
-        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 120), // 10min
-        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 300)  // 25min
+        new SimpleMovingAverage(TimeSpan.FromSeconds(5), 36, IndicatorValueType.Average, simulateWithFirstUpdate: true),  // 1,5min
+        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 120, IndicatorValueType.Average, simulateWithFirstUpdate: true), // 10min
+        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 300, IndicatorValueType.Average, simulateWithFirstUpdate: true)  // 25min
       };
 
       foreach(var indicator in indicators)
@@ -53,13 +53,15 @@ namespace PiTrade.Strategy {
     // TODO: add PiTrade.EventHandling -> convinient stuff for events
 
     private async Task MarketListener(decimal currentPrice) {
-      if (State != null && AllIndicatorsReady) 
+      if(!AllIndicatorsReady) {
+        Log.Info("Preparing Indicators ...");
+        return;
+      }
+      if (State != null) 
         await State(currentPrice);
-      else Log.Info("STATE = null");
     }
 
     private async Task PrepareBuy(decimal currentPrice) {
-      Log.Info("STATE = PrepareBuy");
       if (buyOrder != null) return;
 
       if (AllIndicatorsPositive) {
@@ -78,7 +80,6 @@ namespace PiTrade.Strategy {
     }
 
     private async Task PrepareSell(decimal currentPrice) {
-      Log.Info("STATE = PrepareSell");
       if (sellOrder != null) return;
 
       if (buyOrder != null && AnyIndicatorsNegative &&
@@ -98,13 +99,13 @@ namespace PiTrade.Strategy {
     }
 
     private void BuyFinished(Order buyOrder) {
-      Log.Info("STATE = BuyFinished");
+      Log.Info("BuyFinished");
       AddFilledOrder(buyOrder);
       State = PrepareSell;
     }
 
     private void SellFinished(Order sellOrder) {
-      Log.Info("STATE = SellFinished");
+      Log.Info("SellFinished");
       AddFilledOrder(sellOrder);
       Reset();
       PrintStatus();
