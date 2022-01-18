@@ -68,7 +68,6 @@ namespace PiTrade.Exchange.Indicators {
       var diff = (double)(Value - tmp);
       Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
       if (!IsReady) IsReady = (Tick++) >= maxTicks;
-      Log.Warn($"{Tick} >= {maxTicks} -> {IsReady}");
     }
   }
 }

@@ -11,11 +11,14 @@ using PiTrade.Logging;
 
 namespace PiTrade.Strategy {
   public abstract class Stategy {
+
+    public static IMarket? CommissionMarket { get; set; }
+
     protected const decimal CommissionFee = 0.00075m;
 
     protected IMarket Market { get; }
-    protected decimal Quantity { get; private set; }
-    protected decimal Revenue { get; private set; }
+    protected decimal Expenses { get; private set; }
+    protected decimal Returns { get; private set; }
     protected static decimal Commission { get; private set; }
 
 
@@ -31,27 +34,31 @@ namespace PiTrade.Strategy {
 
 
     protected void AddFilledOrder(Order order) {
+      decimal tmpCommission = 0;
       if(order.IsFilled) {
         lock(locker) {
           Commission += order.Amount * CommissionFee;
-          if (order.Side == OrderSide.BUY) {
-            Revenue -= order.Amount;
-            Quantity += order.Quantity;
-          } else if (order.Side == OrderSide.SELL) {
-            Revenue += order.Amount;
-            Quantity -= order.Quantity;
-            Profit += Revenue - Commission;
+          tmpCommission = Commission;
+          if(tmpCommission > 15) {
+            Expenses += tmpCommission;
+            Commission = 0;
           }
-          Quantity = Quantity.RoundDown(Market.AssetPrecision);
+          if (order.Side == OrderSide.BUY)
+            Expenses += order.Amount;
+          else if (order.Side == OrderSide.SELL)
+            Returns += order.Amount;
+          Profit = Returns - Expenses - Commission;
         }
+      }
+
+      if(CommissionMarket != null && tmpCommission > 15) {
+        var quantity = tmpCommission / CommissionMarket.CurrentPrice;
+        CommissionMarket.CreateMarketOrder(OrderSide.BUY, quantity);
       }
     }
 
     protected virtual void Reset() {
-      lock(locker) {
-        Quantity = 0;
-        Revenue = 0;
-      }
+
     }
 
     protected virtual void PrintStatus() {

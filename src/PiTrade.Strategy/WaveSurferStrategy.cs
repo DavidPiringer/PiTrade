@@ -24,8 +24,8 @@ namespace PiTrade.Strategy {
     private Order? sellOrder;
 
     private bool AllIndicatorsReady => indicators.All(x => x.IsReady);
-    private bool AllIndicatorsPositive => indicators.All(x => x.Slope > 0);
-    private bool AnyIndicatorsNegative => indicators.Any(x => x.Slope < 0);
+    private bool AllIndicatorsPositive(decimal currentPrice) => indicators.All(x => x.Slope > 0 || x.Value < currentPrice);
+    private bool AnyIndicatorsNegative(decimal currentPrice) => indicators.Any(x => x.Slope < 0 || x.Value > currentPrice);
 
 
     private Func<decimal, Task>? State { get; set; }
@@ -35,9 +35,9 @@ namespace PiTrade.Strategy {
       State = PrepareBuy;
 
       indicators = new IIndicator[] {
-        new SimpleMovingAverage(TimeSpan.FromSeconds(5), 36, IndicatorValueType.Average, simulateWithFirstUpdate: true),  // 1,5min
-        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 120, IndicatorValueType.Average, simulateWithFirstUpdate: true), // 10min
-        new ExponentialMovingAverage(TimeSpan.FromSeconds(5), 300, IndicatorValueType.Average, simulateWithFirstUpdate: true)  // 25min
+        new SimpleMovingAverage(TimeSpan.FromSeconds(10), 30, IndicatorValueType.Average, simulateWithFirstUpdate: false), // 5min
+        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 12, IndicatorValueType.Average, simulateWithFirstUpdate: false), // 12min
+        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 26, IndicatorValueType.Average, simulateWithFirstUpdate: false)  // 26min
       };
 
       foreach(var indicator in indicators)
@@ -64,12 +64,12 @@ namespace PiTrade.Strategy {
     private async Task PrepareBuy(decimal currentPrice) {
       if (buyOrder != null) return;
 
-      if (AllIndicatorsPositive) {
+      if (AllIndicatorsPositive(currentPrice)) {
         State = null;
-        var price = Market.CurrentPrice;
-        var quantity = allowedQuote / price;
+        var quantity = allowedQuote / currentPrice;
         Log.Info("BUY");
-        (Order? order, ErrorState error) = await Market.CreateLimitOrder(OrderSide.BUY, price, quantity);
+
+        (Order? order, ErrorState error) = await Market.CreateLimitOrder(OrderSide.BUY, currentPrice, quantity);
         if(error == ErrorState.None && order != null) {
           this.buyOrder = order;
           order.WhenFilled(BuyFinished);
@@ -82,7 +82,7 @@ namespace PiTrade.Strategy {
     private async Task PrepareSell(decimal currentPrice) {
       if (sellOrder != null) return;
 
-      if (buyOrder != null && AnyIndicatorsNegative &&
+      if (buyOrder != null && AnyIndicatorsNegative(currentPrice) &&
          (currentPrice > buyOrder.AvgFillPrice * (1m + UpperThreshold) ||
           currentPrice < buyOrder.AvgFillPrice * (1m - LowerThreshold))) {
         State = null;
