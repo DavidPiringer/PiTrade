@@ -10,13 +10,13 @@ using PiTrade.Logging;
 
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
-    private readonly object locker = new object();
     private readonly bool simulateWithFirstUpdate = false;
     protected readonly IndicatorValueType valueType;
     protected readonly int maxTicks;
+    protected readonly Queue<decimal> values;
 
     private int Tick { get; set; } = 0;
-    public bool IsReady => Tick >= maxTicks;
+    public bool IsReady { get; private set; }
     public TimeSpan Period { get; private set; }
     public decimal Value { get; private set; }
     public double Slope { get; private set; }
@@ -26,6 +26,7 @@ namespace PiTrade.Exchange.Indicators {
       valueType = indicatorValueType;
       this.maxTicks = maxTicks;
       this.simulateWithFirstUpdate = simulateWithFirstUpdate;
+      values = new Queue<decimal>(maxTicks);
     }
 
     public void Update(params PriceCandle[] candles) {
@@ -54,17 +55,20 @@ namespace PiTrade.Exchange.Indicators {
 
 
     private void AddCandle(PriceCandle candle) {
-      if (candle.Period.CompareTo(Period) == 0) {
-        lock (locker) {
-          var tmp = Value;
-          Value = Tick == 0 ? candle.Average : Calculate(Aggregate(candle));
-          var diff = (double)(Value - tmp);
-          Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
-          Tick = IsReady ? Tick : Tick + 1;
-        }
-      } else {
+      if (candle.Period.CompareTo(Period) != 0) {
         Log.Error($"Candle has not the same period as referenced indicator.");
+        return;
       }
+      var value = Aggregate(candle);
+      if (IsReady) values.Dequeue();
+      values.Enqueue(value);
+
+      var tmp = Value;
+      Value = Tick == 0 ? value : Calculate(value);
+      var diff = (double)(Value - tmp);
+      Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
+      if (!IsReady) IsReady = (Tick++) >= maxTicks;
+      Log.Warn($"{Tick} >= {maxTicks} -> {IsReady}");
     }
   }
 }
