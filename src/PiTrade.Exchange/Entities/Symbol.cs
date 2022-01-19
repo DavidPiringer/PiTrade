@@ -14,7 +14,11 @@ namespace PiTrade.Exchange.Entities {
     public static Symbol WIN => new Symbol("WIN");
     public static Symbol SXP => new Symbol("SXP");
     public static Symbol ADA => new Symbol("ADA");
+    public static Symbol LUNA => new Symbol("LUNA");
     public static Symbol PORTO => new Symbol("PORTO");
+    public static Symbol FTM => new Symbol("FTM");
+    public static Symbol ATOM => new Symbol("ATOM");
+    public static Symbol DOT => new Symbol("DOT");
     public static Symbol GALA => new Symbol("GALA");
     public static Symbol DOGE => new Symbol("DOGE");
     public static Symbol MANA => new Symbol("MANA");

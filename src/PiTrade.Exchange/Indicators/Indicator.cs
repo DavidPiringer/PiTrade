@@ -12,7 +12,7 @@ namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
     private readonly bool simulateWithFirstUpdate = false;
     protected readonly IndicatorValueType valueType;
-    protected readonly int maxTicks;
+    protected readonly int maxTicks; //TODO: public property
     protected readonly Queue<decimal> values;
 
     private int Tick { get; set; } = 0;

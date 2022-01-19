@@ -26,15 +26,23 @@ if (commissionMarket == null) {
   Log.Error("Commission Market is null.");
   return;
 }
-Stategy.CommissionMarket = commissionMarket;
+Strategy.CommissionMarket = commissionMarket;
 
 
-//tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 400m, 40m, 0.9m));
 tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 25m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 400m, 40m, 0.96m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.SAND, Symbol.USDT), 200m, 10m, 0.96m));
-//tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 700m, 35m, 0.96m));
-
+/*
+tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.ADA, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.LUNA, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.FTM, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.ATOM, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.DOT, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.DOGE, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.SHIB, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.ROSE, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.GALA, Symbol.USDT), 25m));
+*/
 Task.WaitAll(tasks.ToArray());
 //if (CommissionManager.AwaitTask != null)
   //await CommissionManager.AwaitTask;
