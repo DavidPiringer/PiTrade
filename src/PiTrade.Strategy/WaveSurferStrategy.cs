@@ -13,19 +13,20 @@ using PiTrade.Logging;
 using PiTrade.Strategy.Util;
 
 namespace PiTrade.Strategy {
-  public class WaveSurferStrategy : Stategy {
-    private const decimal UpperThreshold = 0.002m;
-    private const decimal LowerThreshold = 0.002m;
+  public class WaveSurferStrategy : Strategy {
+    private const decimal UpperThreshold = 0.0025m;
+    private const decimal LowerThreshold = 0.0025m;
 
     private readonly IEnumerable<IIndicator> indicators;
     private readonly decimal allowedQuote;
 
     private Order? buyOrder;
     private Order? sellOrder;
+    private bool emergencyStop;
 
     private bool AllIndicatorsReady => indicators.All(x => x.IsReady);
-    private bool AllIndicatorsPositive(decimal currentPrice) => indicators.All(x => x.Slope > 0 || x.Value < currentPrice);
-    private bool AnyIndicatorsNegative(decimal currentPrice) => indicators.Any(x => x.Slope < 0 || x.Value > currentPrice);
+    private bool AllIndicatorsPositive(decimal currentPrice) => indicators.All(x => x.Slope > 1);
+    private bool AnyIndicatorsNegative(decimal currentPrice) => indicators.Any(x => x.Slope < 0);
 
 
     private Func<decimal, Task>? State { get; set; }
@@ -35,9 +36,9 @@ namespace PiTrade.Strategy {
       State = PrepareBuy;
 
       indicators = new IIndicator[] {
-        new SimpleMovingAverage(TimeSpan.FromSeconds(10), 30, IndicatorValueType.Average, simulateWithFirstUpdate: false), // 5min
-        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 12, IndicatorValueType.Average, simulateWithFirstUpdate: false), // 12min
-        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 26, IndicatorValueType.Average, simulateWithFirstUpdate: false)  // 26min
+        //new SimpleMovingAverage(TimeSpan.FromMinutes(1), 9, IndicatorValueType.Close, simulateWithFirstUpdate: false),
+        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 12, IndicatorValueType.Close, simulateWithFirstUpdate: false),
+        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 60, IndicatorValueType.Close, simulateWithFirstUpdate: false)
       };
 
       foreach(var indicator in indicators)
@@ -47,16 +48,19 @@ namespace PiTrade.Strategy {
       this.allowedQuote = allowedQuote;
     } // TODO: add max. quote to fail for
 
-
-
-
     // TODO: add PiTrade.EventHandling -> convinient stuff for events
 
     private async Task MarketListener(decimal currentPrice) {
-      if(!AllIndicatorsReady) {
-        Log.Info("Preparing Indicators ...");
+      if (!AllIndicatorsReady) {
+        Log.Info($"Preparing Indicators ...");
         return;
       }
+
+      // TODO: ConsoleMonitor -> ConsoleGUI
+      //foreach (var indicator in indicators)
+      //  Log.Info($"[{Market.Asset}/{Market.Quote}] {indicator.Period.TotalMinutes}m {indicator.Slope}");
+
+
       if (State != null) 
         await State(currentPrice);
     }
@@ -67,10 +71,11 @@ namespace PiTrade.Strategy {
       if (AllIndicatorsPositive(currentPrice)) {
         State = null;
         var quantity = allowedQuote / currentPrice;
-        Log.Info("BUY");
-
-        (Order? order, ErrorState error) = await Market.CreateLimitOrder(OrderSide.BUY, currentPrice, quantity);
-        if(error == ErrorState.None && order != null) {
+        Log.Info($"BUY {Market.Asset}/{Market.Quote}");
+        // TODO: update pooling in order
+        //(Order? order, ErrorState error) = await Market.CreateLimitOrder(OrderSide.BUY, currentPrice, quantity);
+        (Order? order, ErrorState error) = await Market.CreateMarketOrder(OrderSide.BUY, quantity);
+        if (error == ErrorState.None && order != null) {
           this.buyOrder = order;
           order.WhenFilled(BuyFinished);
         } else {
@@ -80,15 +85,17 @@ namespace PiTrade.Strategy {
     }
 
     private async Task PrepareSell(decimal currentPrice) {
-      if (sellOrder != null) return;
+      if (sellOrder != null || buyOrder == null) return;
 
-      if (buyOrder != null && AnyIndicatorsNegative(currentPrice) &&
-         (currentPrice > buyOrder.AvgFillPrice * (1m + UpperThreshold) ||
-          currentPrice < buyOrder.AvgFillPrice * (1m - LowerThreshold))) {
+      var isProfitableTrade = currentPrice > buyOrder.AvgFillPrice * (1m + UpperThreshold);
+      var isUnprofitableTrade = currentPrice < buyOrder.AvgFillPrice * (1m - LowerThreshold);
+      if (AnyIndicatorsNegative(currentPrice) &&
+         (isProfitableTrade || isUnprofitableTrade)) {
         State = null;
-        Log.Info("SELL");
 
         (Order? order, ErrorState error) = await Market.CreateMarketOrder(OrderSide.SELL, buyOrder.Quantity);
+        Log.Info($"SELL {Market.Asset}/{Market.Quote} (profitable = {isProfitableTrade})");
+
         if (error == ErrorState.None && order != null) {
           this.sellOrder = order;
           order.WhenFilled(SellFinished);
@@ -108,14 +115,30 @@ namespace PiTrade.Strategy {
       Log.Info("SellFinished");
       AddFilledOrder(sellOrder);
       Reset();
-      PrintStatus();
-      State = PrepareBuy;
+    }
+
+    protected override void EmergencyStop() {
+      base.EmergencyStop();
+      emergencyStop = true;
+      Task? buyCancel = buyOrder?.Cancel();
+      Task? sellCancel = sellOrder?.Cancel();
+      buyCancel?.Wait();
+      sellCancel?.Wait();
     }
 
     protected override void Reset() {
       base.Reset();
+
+      if (buyOrder != null && sellOrder != null) {
+        Log.Info($"[{Market.Asset}/{Market.Quote}] {buyOrder.Amount} < {sellOrder.Amount} " +
+          $"(AVG = {buyOrder.AvgFillPrice} < {sellOrder.AvgFillPrice}) " +
+          $"(Target = {buyOrder.TargetPrice} < {sellOrder.TargetPrice})");
+      }
+
       this.buyOrder = null;
       this.sellOrder = null;
+      if(!emergencyStop)
+        State = PrepareBuy;
     }
   }
 }
