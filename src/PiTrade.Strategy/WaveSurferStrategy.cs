@@ -25,7 +25,7 @@ namespace PiTrade.Strategy {
     private bool emergencyStop;
 
     private bool AllIndicatorsReady => indicators.All(x => x.IsReady);
-    private bool AllIndicatorsPositive(decimal currentPrice) => indicators.All(x => x.Slope > 1);
+    private bool AllIndicatorsPositive(decimal currentPrice) => indicators.All(x => x.Slope > 0.5);
     private bool AnyIndicatorsNegative(decimal currentPrice) => indicators.Any(x => x.Slope < 0);
 
 
@@ -37,20 +37,19 @@ namespace PiTrade.Strategy {
 
       indicators = new IIndicator[] {
         //new SimpleMovingAverage(TimeSpan.FromMinutes(1), 9, IndicatorValueType.Close, simulateWithFirstUpdate: false),
-        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 12, IndicatorValueType.Close, simulateWithFirstUpdate: false),
-        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 60, IndicatorValueType.Close, simulateWithFirstUpdate: false)
+        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 12, IndicatorValueType.Close, simulateWithFirstUpdate: true),
+        new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 60, IndicatorValueType.Close, simulateWithFirstUpdate: true)
       };
 
       foreach(var indicator in indicators)
         market.AddIndicator(indicator);
 
-      market.Listen(MarketListener);
       this.allowedQuote = allowedQuote;
     } // TODO: add max. quote to fail for
 
     // TODO: add PiTrade.EventHandling -> convinient stuff for events
 
-    private async Task MarketListener(decimal currentPrice) {
+    protected override async Task Update(decimal currentPrice) {
       if (!AllIndicatorsReady) {
         Log.Info($"Preparing Indicators ...");
         return;

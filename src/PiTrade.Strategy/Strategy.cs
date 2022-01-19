@@ -28,10 +28,12 @@ namespace PiTrade.Strategy {
 
     protected Strategy(IMarket market) {
       this.Market = market;
+      market.Listen(Update);
     }
 
     public virtual async Task Run() => await Market.Connect();
 
+    protected abstract Task Update(decimal currentPrice);
 
     protected void AddFilledOrder(Order order) {
       decimal tmpCommission = 0;
