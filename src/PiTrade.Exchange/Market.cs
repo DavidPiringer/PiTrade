@@ -28,6 +28,7 @@ namespace PiTrade.Exchange {
     private Task? MarketLoop { get; set; }
 
 
+
     public Market(IExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision) {
       Exchange = exchange;
       Asset = asset;
@@ -79,10 +80,9 @@ namespace PiTrade.Exchange {
     }
 
     protected internal abstract Task<ErrorState> CancelOrder(Order order);
-    protected abstract Task InitMarketLoop();
+    protected virtual Task InitMarketLoop() => Task.CompletedTask;
     protected abstract Task<ITradeUpdate?> MarketLoopCycle(CancellationToken token);
-    protected abstract Task ExitMarketLoop();
-
+    protected virtual Task ExitMarketLoop() => Task.CompletedTask;
 
     private Task CreateMarketLoop(CancellationToken token) { 
       var task = Task.Factory.StartNew(async () => {

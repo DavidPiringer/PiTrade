@@ -49,10 +49,11 @@ namespace PiTrade.Exchange {
         lock (locker) {
           ExecutedQuantity += update.Quantity;
           summedPriceFills += update.Price;
-          fillCount++;
-          AvgFillPrice = summedPriceFills / fillCount;
+          //fillCount++;
+          //AvgFillPrice = summedPriceFills / fillCount;
+          AvgFillPrice += update.Price * (update.Quantity / Quantity);
           ExecutedAmount = AvgFillPrice * ExecutedQuantity;
-          Amount = AvgFillPrice * Quantity;
+          Amount = AvgFillPrice * ExecutedQuantity;
           IsFilled = Quantity <= ExecutedQuantity;
           if (IsFilled) fillTCS.SetResult();
         }
