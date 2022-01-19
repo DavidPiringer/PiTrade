@@ -30,7 +30,6 @@ Strategy.CommissionMarket = commissionMarket;
 
 
 tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 25m));
-/*
 tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 25m));
 tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 25m));
 tasks.Add(Start(exchange.GetMarket(Symbol.ADA, Symbol.USDT), 25m));
@@ -42,14 +41,14 @@ tasks.Add(Start(exchange.GetMarket(Symbol.DOGE, Symbol.USDT), 25m));
 tasks.Add(Start(exchange.GetMarket(Symbol.SHIB, Symbol.USDT), 25m));
 tasks.Add(Start(exchange.GetMarket(Symbol.ROSE, Symbol.USDT), 25m));
 tasks.Add(Start(exchange.GetMarket(Symbol.GALA, Symbol.USDT), 25m));
-*/
+
 Task.WaitAll(tasks.ToArray());
 //if (CommissionManager.AwaitTask != null)
   //await CommissionManager.AwaitTask;
 
-Task Start(IMarket? market, decimal maxQuote) {
+Task Start(IMarket? market, decimal quotePerGrid, decimal sellThreshold, int buyGridCount) {
   if(market != null) {
-    var strategy = new WaveSurferStrategy(market, maxQuote, false);
+    var strategy = new GridTradingStrategy(market, quotePerGrid, sellThreshold, buyGridCount);
     return strategy.Run();
   }
   return Task.CompletedTask;
