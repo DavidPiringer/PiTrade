@@ -23,6 +23,7 @@ namespace PiTrade.Strategy {
     private readonly int buyGridCount;
     private readonly decimal quotePerGrid;
     private readonly decimal sellThreshold;
+    private readonly decimal buyGridDistance;
     private readonly IIndicator indicator;
     private readonly IDictionary<Order, int> hitDict = new Dictionary<Order, int>();
 
@@ -33,14 +34,15 @@ namespace PiTrade.Strategy {
     private decimal BasePrice { get; set; }
     private decimal ResetPrice { get; set; }
     private int CurrentGridIndex { get; set; }
-    private decimal CurrentBuyPrice => BasePrice * (1m - CurrentGridIndex * sellThreshold);
+    private decimal CurrentBuyPrice => BasePrice * (1m - CurrentGridIndex * buyGridDistance);
     private bool IndicatorIsPositive => indicator.IsReady && indicator.Trend > 0;
      
 
-    public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal sellThreshold, int buyGridCount) : base(market) {
+    public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal sellThreshold, decimal buyGridDistance, int buyGridCount) : base(market) {
       this.buyGridCount = buyGridCount;
       this.quotePerGrid = quotePerGrid;
       this.sellThreshold = sellThreshold;
+      this.buyGridDistance = buyGridDistance;
       indicator = new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 12, IndicatorValueType.Close, simulateWithFirstUpdate: true);
       Market.AddIndicator(indicator);
       State = Init;
