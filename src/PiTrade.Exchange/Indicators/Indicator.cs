@@ -19,6 +19,7 @@ namespace PiTrade.Exchange.Indicators {
     public bool IsReady { get; private set; }
     public TimeSpan Period { get; private set; }
     public decimal Value { get; private set; }
+    public decimal Trend { get; private set; }
     public double Slope { get; private set; }
 
     public Indicator(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close, bool simulateWithFirstUpdate = false) {
@@ -65,8 +66,8 @@ namespace PiTrade.Exchange.Indicators {
 
       var tmp = Value;
       Value = Tick == 0 ? value : Calculate(value);
-      var diff = (double)(Value - tmp);
-      Slope = Math.Atan(diff / Period.TotalSeconds) * (180.0 / Math.PI);
+      Trend = Value - tmp;
+      Slope = Math.Atan((double)Trend / Period.TotalSeconds) * (180.0 / Math.PI);
       if (!IsReady) IsReady = (Tick++) >= maxTicks;
     }
   }
