@@ -9,54 +9,49 @@ using PiTrade.Logging;
 namespace PiTrade.Networking {
   public class WebSocket {
     private static readonly int receiveBufferSize = 8192;
+    private readonly Uri uri;
 
     private ClientWebSocket? Socket { get; set; }
     private CancellationTokenSource? CTS { get; set; }
 
-    public bool IsConnected { get; private set; } = false;
+    public WebSocket(Uri connectionUri) { 
+      uri = connectionUri;
+    }
 
 
-    public WebSocket() { }
-
-
-    public async Task<string?> NextMessage() {
-      if (Socket == null || CTS == null || Socket.State != WebSocketState.Open)
-        throw new InvalidOperationException("WebSocket is not connected. Call Connect(Uri) before.");
-
-      var buffer = new byte[receiveBufferSize];
-      string? msg = null;
-      using MemoryStream outputStream = new(receiveBufferSize);
+    public async Task<(string? message, bool success)> NextMessage() {
       try {
+        if (Socket == null || CTS == null || Socket.State != WebSocketState.Open)
+          await Connect();
+
+        var buffer = new byte[receiveBufferSize];
+        using MemoryStream outputStream = new(receiveBufferSize);
         WebSocketReceiveResult receiveResult;
-        do {
-            receiveResult = await Socket.ReceiveAsync(buffer, CTS.Token);
-            if (receiveResult.MessageType != WebSocketMessageType.Close)
-              outputStream.Write(buffer, 0, receiveResult.Count);
-          
+        if (Socket != null && CTS != null) do {
+          receiveResult = await Socket.ReceiveAsync(buffer, CTS.Token);
+          if (receiveResult.MessageType != WebSocketMessageType.Close)
+            outputStream.Write(buffer, 0, receiveResult.Count);
         } while (!receiveResult.EndOfMessage);
         outputStream.Position = 0;
-
         using StreamReader reader = new(outputStream);
-        msg = reader.ReadToEnd();
-      } catch (WebSocketException ex) {
+        return (reader.ReadToEnd(), true);
+      } catch (Exception ex) {
         Log.Error($"{ex.GetType().Name} - {ex.Message}");
+        return (null, false);
       }
-      return msg;
     }
 
     /*
      * TODO: SendMessage()
      */
 
-    public async Task Connect(Uri connectionUri) {
-      IsConnected = true;
+    private async Task Connect() {
       Socket = new ClientWebSocket();
       CTS = new CancellationTokenSource();
-      await Socket.ConnectAsync(connectionUri, CTS.Token);
+      await Socket.ConnectAsync(uri, CTS.Token);
     }
 
-    public async Task Disconnect() {
-      IsConnected = false;
+    private async Task Disconnect() {
       if(Socket != null) {
         if (Socket.State == WebSocketState.Open && CTS != null) {
           CTS.CancelAfter(TimeSpan.FromSeconds(2));

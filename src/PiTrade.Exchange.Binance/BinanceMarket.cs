@@ -13,8 +13,7 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange.Binance {
   internal class BinanceMarket : Market {
-    private readonly WebSocket webSocket = new WebSocket();
-    private readonly Uri uri;
+    private readonly WebSocket webSocket;
 
 
 
@@ -23,7 +22,7 @@ namespace PiTrade.Exchange.Binance {
     internal BinanceMarket(BinanceExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision)
       : base(exchange, asset, quote, assetPrecision, quotePrecision) {
       Exchange = exchange;
-      uri = new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade");
+      webSocket = new WebSocket(new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade"));
     }
 
     public override Task<(Order? order, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity) =>
@@ -35,26 +34,12 @@ namespace PiTrade.Exchange.Binance {
     protected async override Task<ErrorState> CancelOrder(Order order) =>
         await Exchange.Cancel(order);
 
-    protected override async Task InitMarketLoop() {
-      await webSocket.Connect(uri);
-    }
 
     protected override async Task<ITradeUpdate?> MarketLoopCycle(CancellationToken token) {
-      try {
-        var msg = await webSocket.NextMessage(); //TODO: nextmessage out param -> return bool (Success)?
-        if(msg == null) return null;
-
+      (string? msg, bool success) = await webSocket.NextMessage();
+      if (success && msg != null)
         return JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
-      } catch (Exception ex) {
-        Log.Error($"[OrderUpdateLoopCycle] -> {ex.Message}");
-        return null;
-      }
+      return null;
     }
-
-    protected override async Task ExitMarketLoop() {
-      await webSocket.Disconnect();
-    }
-
-    
   }
 }
