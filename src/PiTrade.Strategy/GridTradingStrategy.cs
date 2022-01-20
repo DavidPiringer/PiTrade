@@ -36,19 +36,14 @@ namespace PiTrade.Strategy {
     private readonly decimal buyGridDistance;
     private readonly IIndicator indicator;
     private readonly IList<Grid> grids;
+    private readonly IList<Order> emergencySells;
 
     private Func<decimal, Task>? State { get; set; }
-
 
     private decimal BasePrice { get; set; }
     private decimal ResetUpPrice { get; set; }
     private decimal ResetLowPrice { get; set; }
-
-    private bool IndicatorIsPositive => 
-      indicator.IsReady && indicator.Trend > 0;
-     
-
-    // TODO: accurate profit calculation
+         
 
     public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal sellThreshold, decimal buyGridDistance, int buyGridCount) : base(market) {
       this.buyGridCount = buyGridCount;
@@ -56,6 +51,7 @@ namespace PiTrade.Strategy {
       this.sellThreshold = sellThreshold;
       this.buyGridDistance = buyGridDistance;
       this.grids = new List<Grid>();
+      this.emergencySells = new List<Order>();
 
       indicator = new ExponentialMovingAverage(TimeSpan.FromSeconds(10), 42, IndicatorValueType.Average, simulateWithFirstUpdate: true);
       Market.AddIndicator(indicator);
@@ -74,19 +70,23 @@ namespace PiTrade.Strategy {
       IEnumerable<Order> tmp = Enumerable.Empty<Order>();
       BasePrice = currentPrice;
       ResetUpPrice = currentPrice * (1m + sellThreshold * 2);
-      ResetLowPrice = currentPrice * (1m - (buyGridCount + 1) * buyGridDistance);
+      ResetLowPrice = currentPrice * (1m - (buyGridCount + 2) * buyGridDistance);
       InitializeGrids(currentPrice);
       State = Cycle;
     }
 
     private async Task EmergencySell() {
+      Log.Error($"[{Market.Asset}{Market.Quote}] EMERGENCY SELL");
       var unselledQuantity = grids
         .Where(x => x.SellOrder != null)
         .Select(x => x.SellOrder)
         .Cast<Order>()
         .Where(x => !x.IsFilled)
         .Sum(x => x.Quantity - x.ExecutedQuantity);
-      await Market.CreateMarketOrder(OrderSide.SELL, unselledQuantity);
+      (Order? order, ErrorState error) = await Market.CreateMarketOrder(OrderSide.SELL, unselledQuantity);
+      if (error == ErrorState.None && order != null) {
+        order.WhenFilled(EmergencySellFinished);
+      }
     }
 
     private async Task Cycle(decimal currentPrice) {
@@ -99,17 +99,13 @@ namespace PiTrade.Strategy {
       }
       if (indicator.IsBearish) return; 
 
-      int hits = 0;
-      IList<Grid> hitGrids = new List<Grid>();
-      while(hits < grids.Count && grids[hits].Price >= currentPrice) {
-        hitGrids.Add(grids[hits]);
-        ++hits;
-      }
+      var hits = grids
+        .Where(x => x.Price >= currentPrice && 
+                    x.BuyOrder == null && 
+                    x.SellOrder == null);
 
       // found next buy order
-      if (hits > 0) {
-        await SetupBuyOrder(currentPrice, hitGrids);
-      }
+      if (hits.Any()) await SetupBuyOrder(currentPrice, hits);
     }
 
     private void InitializeGrids(decimal basePrice) {
@@ -179,6 +175,13 @@ namespace PiTrade.Strategy {
       LogProfit();
     }
 
+    private async Task EmergencySellFinished(Order sellOrder) {
+      Log.Info($"[{Market.Asset}{Market.Quote}] EMERGENCY SELL Finished price = {sellOrder.AvgFillPrice}");
+      await AddFilledOrder(sellOrder);
+      emergencySells.Add(sellOrder);
+      LogProfit();
+    }
+
     private void LogProfit() {
       var filledOrders = grids
         .Where(
@@ -186,6 +189,7 @@ namespace PiTrade.Strategy {
           x.BuyOrder.IsFilled && x.SellOrder.IsFilled)
         .SelectMany(x => new Order[] { x.BuyOrder, x.SellOrder })
         .Cast<Order>()
+        .Union(emergencySells)
         .Distinct()
         .ToArray();
       decimal revenue = 0m;
