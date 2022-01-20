@@ -6,12 +6,8 @@ using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
 using PiTrade.Strategy;
-using PiTrade.Strategy.Util;
 
-
-
-//var configPath = @"C:\Users\David\Documents\binanceConfig.json";
-var configPath = args.FirstOrDefault("");
+var configPath = args.FirstOrDefault(@"C:\Users\David\Documents\binanceConfig.json");
 var config = JObject.Parse(File.ReadAllText(configPath));
 
 var key = config["key"]?.ToString();
