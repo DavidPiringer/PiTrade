@@ -19,6 +19,10 @@ namespace PiTrade.Exchange.Entities {
     public static Symbol FTM => new Symbol("FTM");
     public static Symbol ATOM => new Symbol("ATOM");
     public static Symbol DOT => new Symbol("DOT");
+    public static Symbol GLMR => new Symbol("GLMR");
+    public static Symbol BADGER => new Symbol("BADGER");
+    public static Symbol TFUEL => new Symbol("TFUEL");
+    public static Symbol LOKA => new Symbol("LOKA");
     public static Symbol GALA => new Symbol("GALA");
     public static Symbol DOGE => new Symbol("DOGE");
     public static Symbol MANA => new Symbol("MANA");
