@@ -28,27 +28,26 @@ if (commissionMarket == null) {
 }
 Strategy.CommissionMarket = commissionMarket;
 
-
-tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.ADA, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.LUNA, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.FTM, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.ATOM, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.DOT, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.DOGE, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.SHIB, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.ROSE, Symbol.USDT), 25m));
-tasks.Add(Start(exchange.GetMarket(Symbol.GALA, Symbol.USDT), 25m));
+tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 10m, 0.005m, 0.0025m, 20));
+/*
+tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 10m, 0.005m, 0.0025m, 20));
+tasks.Add(Start(exchange.GetMarket(Symbol.LUNA, Symbol.USDT), 10m, 0.01m, 0.0035m, 10));
+tasks.Add(Start(exchange.GetMarket(Symbol.ATOM, Symbol.USDT), 10m, 0.01m, 0.0035m, 10));
+tasks.Add(Start(exchange.GetMarket(Symbol.SAND, Symbol.USDT), 10m, 0.02m, 0.0035m, 10));
+tasks.Add(Start(exchange.GetMarket(Symbol.BADGER, Symbol.USDT), 10m, 0.02m, 0.0035m, 5));
+tasks.Add(Start(exchange.GetMarket(Symbol.GLMR, Symbol.USDT), 10m, 0.02m, 0.0035m, 5));
+tasks.Add(Start(exchange.GetMarket(Symbol.FTM, Symbol.USDT), 10m, 0.02m, 0.0035m, 5));
+tasks.Add(Start(exchange.GetMarket(Symbol.SHIB, Symbol.USDT), 10m, 0.02m, 0.0035m, 5));
+*/
+//tasks.Add(Start(exchange.GetMarket(Symbol.LOKA, Symbol.USDT), 10m, 0.04m, 0.0035m, 5));
 
 Task.WaitAll(tasks.ToArray());
 //if (CommissionManager.AwaitTask != null)
   //await CommissionManager.AwaitTask;
 
-Task Start(IMarket? market, decimal quotePerGrid, decimal sellThreshold, int buyGridCount) {
+Task Start(IMarket? market, decimal quotePerGrid, decimal buyGridDistance, decimal sellThreshold, int buyGridCount) {
   if(market != null) {
-    var strategy = new GridTradingStrategy(market, quotePerGrid, sellThreshold, buyGridCount);
+    var strategy = new GridTradingStrategy(market, quotePerGrid, buyGridDistance, sellThreshold, buyGridCount);
     return strategy.Run();
   }
   return Task.CompletedTask;

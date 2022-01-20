@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,19 +12,23 @@ using PiTrade.Logging;
 
 namespace PiTrade.Strategy {
   public abstract class Strategy {
-
-    public static IMarket? CommissionMarket { get; set; }
+    private static readonly object locker = new object();
+    private static ConcurrentDictionary<int, Order> orders = new ConcurrentDictionary<int, Order>();
 
     protected const decimal CommissionFee = 0.00075m;
 
+    public static IMarket? CommissionMarket { get; set; }
+
+
     protected IMarket Market { get; }
-    protected decimal Expenses { get; private set; }
-    protected decimal Returns { get; private set; }
+
     protected static decimal OpenCommission { get; private set; }
 
-
-    private static readonly object locker = new object();
-    private static decimal Profit { get; set; }
+    private static decimal profit = 0m;
+    private static decimal Profit {
+      get => profit;
+      set { lock (locker) profit = value; }
+    }
 
 
     protected Strategy(IMarket market) {
@@ -35,7 +40,9 @@ namespace PiTrade.Strategy {
 
     protected abstract Task Update(decimal currentPrice);
 
-    protected void AddFilledOrder(Order order) {
+    protected async Task AddFilledOrder(Order order) {
+      //orders.TryAdd(order.GetHashCode(), order);
+
       decimal tmpCommission = 0;
       decimal commissionOfOrder = order.Amount * CommissionFee;
       if (order.IsFilled) {
@@ -43,27 +50,14 @@ namespace PiTrade.Strategy {
           OpenCommission += commissionOfOrder;
           tmpCommission = OpenCommission;
           if(tmpCommission > 15) {
-            Expenses += tmpCommission;
             OpenCommission = 0;
-          }
-          if (order.Side == OrderSide.BUY) {
-            Expenses += order.Amount;
-            Expenses += commissionOfOrder;
-          } else if (order.Side == OrderSide.SELL) {
-            Returns += order.Amount;
-            Expenses += commissionOfOrder;
-            Profit += Returns - Expenses;
-          }
-
-          if (Profit < -20m) {
-            EmergencyStop();
           }
         }
       }
 
       if(CommissionMarket != null && tmpCommission > 15) {
         var quantity = tmpCommission / CommissionMarket.CurrentPrice;
-        CommissionMarket.CreateMarketOrder(OrderSide.BUY, quantity);
+        await CommissionMarket.CreateMarketOrder(OrderSide.BUY, quantity);
       }
     }
 
@@ -72,12 +66,6 @@ namespace PiTrade.Strategy {
     }
 
     protected virtual void Reset() {
-      PrintStatus();
-    }
-
-    protected virtual void PrintStatus() {
-      Log.Info($"Reset {Market.Asset}/{Market.Quote}");
-      Log.Info($"Profit = {Profit}");
     }
   }
 }

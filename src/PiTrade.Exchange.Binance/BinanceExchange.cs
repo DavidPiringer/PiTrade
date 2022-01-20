@@ -177,6 +177,7 @@ namespace PiTrade.Exchange.Binance {
             Log.Error(requestUri);
             Log.Error(response);
             Log.Error(json);
+            // TODO: deserialize in binance error response
           }
           return typeof(T) != typeof(EmptyJsonResponse) ?
                  JsonConvert.DeserializeObject<T>(json) : default(T);

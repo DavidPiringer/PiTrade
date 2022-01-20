@@ -21,6 +21,8 @@ namespace PiTrade.Exchange.Indicators {
     public decimal Value { get; private set; }
     public decimal Trend { get; private set; }
     public double Slope { get; private set; }
+    public bool IsBearish => IsReady && Trend < 0;
+    public bool IsBullish => IsReady && Trend > 0;
 
     public Indicator(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close, bool simulateWithFirstUpdate = false) {
       Period = period;
