@@ -12,7 +12,7 @@ namespace PiTrade.Exchange.Indicators {
     decimal Value { get; }
     decimal Trend { get; }
     double Slope { get; }
-    bool IsBearish { get}
+    bool IsBearish { get; }
     bool IsBullish { get; }
     void Update(params PriceCandle[] candles);
   }
