@@ -49,8 +49,6 @@ namespace PiTrade.Exchange {
         lock (locker) {
           ExecutedQuantity += update.Quantity;
           summedPriceFills += update.Price;
-          //fillCount++;
-          //AvgFillPrice = summedPriceFills / fillCount;
           AvgFillPrice += update.Price * (update.Quantity / Quantity);
           ExecutedAmount = AvgFillPrice * ExecutedQuantity;
           Amount = AvgFillPrice * ExecutedQuantity;
@@ -62,8 +60,8 @@ namespace PiTrade.Exchange {
 
     public async Task Cancel() {
       if (!IsFilled && !CTS.IsCancellationRequested) {
-        await ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
         CTS.Cancel();
+        await ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
       }
     }
 
@@ -102,19 +100,13 @@ namespace PiTrade.Exchange {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
         }
-
-        Cancel().Wait();
-        // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-        // TODO: set large fields to null
+        Cancel().Wait(5000);
         disposedValue = true;
       }
     }
 
-    // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-    ~Order() {
-      // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-      Dispose(disposing: false);
-    }
+    // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+    ~Order() => Dispose(disposing: false);
 
     public void Dispose() {
       // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
