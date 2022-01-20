@@ -15,9 +15,6 @@ namespace PiTrade.Exchange {
     private readonly TaskCompletionSource fillTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource CTS = new CancellationTokenSource();
 
-    private decimal summedPriceFills = 0m;
-    private int fillCount = 0;
-
     public long Id { get; }
     public Market Market { get; }
     public OrderSide Side { get; }
@@ -48,7 +45,6 @@ namespace PiTrade.Exchange {
         // -> prevents race conditions
         lock (locker) {
           ExecutedQuantity += update.Quantity;
-          summedPriceFills += update.Price;
           AvgFillPrice += update.Price * (update.Quantity / Quantity);
           ExecutedAmount = AvgFillPrice * ExecutedQuantity;
           Amount = AvgFillPrice * ExecutedQuantity;

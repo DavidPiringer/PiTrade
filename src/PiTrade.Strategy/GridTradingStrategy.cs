@@ -187,7 +187,7 @@ namespace PiTrade.Strategy {
         .Where(
           x => x.BuyOrder != null && x.SellOrder != null &&
           x.BuyOrder.IsFilled && x.SellOrder.IsFilled)
-        .SelectMany(x => new Order[] { x.BuyOrder, x.SellOrder })
+        .SelectMany(x => new Order?[] { x.BuyOrder, x.SellOrder })
         .Cast<Order>()
         .Union(emergencySells)
         .Distinct()
