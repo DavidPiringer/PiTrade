@@ -27,7 +27,7 @@ namespace PiTrade.Exchange.Binance {
     }
 
 
-    public event Action<IMarket> MarketAdded;
+    public event Action<IMarket>? MarketAdded;
 
     public IEnumerable<IMarket> AvailableMarkets => marketDict.Values;
 
