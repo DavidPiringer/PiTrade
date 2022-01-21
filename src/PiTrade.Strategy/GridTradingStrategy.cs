@@ -40,10 +40,12 @@ namespace PiTrade.Strategy {
 
     private Func<decimal, Task>? State { get; set; }
 
-    private decimal BasePrice { get; set; }
     private decimal ResetUpPrice { get; set; }
     private decimal ResetLowPrice { get; set; }
          
+    // TODO: add "WhenError" for orders -> put order creation on market into order
+    // TODO: add "HandleCommission" for market -> handles commission and maybe change quantity of order
+
 
     public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal sellThreshold, decimal buyGridDistance, int buyGridCount) : base(market) {
       this.buyGridCount = buyGridCount;
@@ -68,7 +70,6 @@ namespace PiTrade.Strategy {
 
       Log.Info($"[{Market.Asset}{Market.Quote}] Init");
       IEnumerable<Order> tmp = Enumerable.Empty<Order>();
-      BasePrice = currentPrice;
       ResetUpPrice = currentPrice * (1m + sellThreshold * 2);
       ResetLowPrice = currentPrice * (1m - (buyGridCount + 2) * buyGridDistance);
       InitializeGrids(currentPrice);
@@ -138,6 +139,7 @@ namespace PiTrade.Strategy {
         order.WhenFilled(BuyFinished);
       } else {
         Log.Error($"Error for SELL -> {error}");
+        await Task.Delay(TimeSpan.FromSeconds(10)); // TODO: handle better
       }
     }
 
@@ -157,6 +159,7 @@ namespace PiTrade.Strategy {
         order.WhenFilled(SellFinished);
       } else {
         Log.Error($"Error for SELL -> {error}");
+        await Task.Delay(TimeSpan.FromSeconds(10)); // TODO: handle better
       }
     }
 
