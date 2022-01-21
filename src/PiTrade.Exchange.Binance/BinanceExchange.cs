@@ -5,6 +5,7 @@ using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Logging;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -16,6 +17,8 @@ namespace PiTrade.Exchange.Binance {
     private readonly string secret;
     private readonly HttpClient client;
     private readonly object locker = new object();
+    private readonly ConcurrentDictionary<string, IMarket> marketDict
+      = new ConcurrentDictionary<string, IMarket>();
 
     private long ping;
     private long Ping {
@@ -23,7 +26,10 @@ namespace PiTrade.Exchange.Binance {
       set { lock (locker) { ping = value; } }
     }
 
-    public IEnumerable<IMarket> AvailableMarkets { get; private set; } = Enumerable.Empty<IMarket>();
+
+    public event Action<IMarket> MarketAdded;
+
+    public IEnumerable<IMarket> AvailableMarkets => marketDict.Values;
 
     public BinanceExchange(string key, string secret) {
       this.secret = secret;
@@ -31,7 +37,7 @@ namespace PiTrade.Exchange.Binance {
       client.BaseAddress = new Uri(BaseUri);
       client.Timeout = TimeSpan.FromSeconds(10);
       client.DefaultRequestHeaders.Add("X-MBX-APIKEY", key);
-      InitExchange().Wait();
+      UpdateExchange().Wait();
     }
 
     public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds() {
@@ -51,37 +57,41 @@ namespace PiTrade.Exchange.Binance {
       AvailableMarkets.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
 
     #region Private Methods
-    private async Task InitExchange() {
+    private async Task UpdateExchange() {
       var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
-      var markets = new List<IMarket>();
 
       if (response != null) {
         Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        foreach (var symbol in response.Symbols ?? Enumerable.Empty<SymbolInformation>()) {
-          if (symbol.BaseAsset != null && symbol.QuoteAsset != null && symbol.Filters != null) {
-            var assetPrecision = symbol.Filters.Where(x => x.FilterType == "LOT_SIZE").Select(x => CalcPrecision(x.StepSize)).FirstOrDefault(-1);
-            var quotePrecision = symbol.Filters.Where(x => x.FilterType == "PRICE_FILTER").Select(x => CalcPrecision(x.TickSize)).FirstOrDefault(-1);
-            if (assetPrecision != -1 && quotePrecision != -1)
-              markets.Add(new BinanceMarket(this,
-                new Symbol(symbol.BaseAsset),
-                new Symbol(symbol.QuoteAsset),
-                assetPrecision, quotePrecision));
+        var symbols = response.Symbols ?? Enumerable.Empty<SymbolInformation>();
+        foreach (var symbol in symbols) {
+          if (symbol.BaseAsset != null &&
+              symbol.QuoteAsset != null &&
+              symbol.Filters != null &&
+              symbol.IsSpotTradingAllowed.HasValue &&
+              symbol.IsSpotTradingAllowed.Value &&
+              symbol.MarketString != null &&
+              !marketDict.ContainsKey(symbol.MarketString)) {
+
+            var assetPrecision = symbol.AssetPrecision;
+            var quotePrecision = symbol.QuotePrecision;
+
+            if (assetPrecision.HasValue && quotePrecision.HasValue) {
+              var market = new BinanceMarket(this, new Symbol(symbol.BaseAsset), new Symbol(symbol.QuoteAsset),
+                                             assetPrecision.Value, quotePrecision.Value);
+              if (marketDict.TryAdd(symbol.MarketString, market)) {
+                MarketAdded?.Invoke(market);
+              }
+            }
           }
         }
       }
-      AvailableMarkets = markets;
       RefreshServerDeltaTime();
-      //var timer = new Timer()
     }
 
     private void RefreshServerDeltaTime() =>
-      Task.Delay(TimeSpan.FromMinutes(1))
-          .ContinueWith(t => Send<ExchangeInformation>("/api/v3/time", HttpMethod.Get)
-          .ContinueWith(r => {
-            Ping = r.Result == null ? 0 : r.Result.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            RefreshServerDeltaTime();
-          }));
+      Task.Delay(TimeSpan.FromMinutes(5))
+          .ContinueWith(r => UpdateExchange().Wait());
     #endregion
 
     #region Internal Methods
@@ -117,7 +127,7 @@ namespace PiTrade.Exchange.Binance {
     internal async Task<ErrorState> Cancel(Order order) =>
       await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
         { {"symbol", MarketString(order.Market) },
-        {"orderId", order.Id.ToString()} }) == null ? 
+        {"orderId", order.Id.ToString()} }) == null ?
       ErrorState.ConnectionLost : ErrorState.None;
 
 
@@ -127,15 +137,9 @@ namespace PiTrade.Exchange.Binance {
 
     #endregion
 
-    #region Helper
-    private static int CalcPrecision(string? input) {
-      if (input == null) return -1;
-      var decimalSeparator = NumberFormatInfo.CurrentInfo.CurrencyDecimalSeparator;
-      var digits = input.Split(decimalSeparator).Last();
-      var position = digits.IndexOf("1");
-      return (position == -1) ? 0 : position + 1;
-    }
+    public override string ToString() => "Binance";
 
+    #region Helper
     private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
     #endregion
 

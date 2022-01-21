@@ -9,6 +9,7 @@ using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public abstract class Market : IMarket {
+    private readonly string name;
     private readonly object locker = new object();
     private readonly IDictionary<long, PriceCandleTicker> priceCandleTickers = new Dictionary<long, PriceCandleTicker>();
     private readonly IList<IIndicator> indicators = new List<IIndicator>();
@@ -30,6 +31,7 @@ namespace PiTrade.Exchange {
 
 
     public Market(IExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision) {
+      name = $"{exchange}-{asset}{quote}";
       Exchange = exchange;
       Asset = asset;
       Quote = quote;
@@ -115,6 +117,9 @@ namespace PiTrade.Exchange {
       task.Wait();
       return task.Result;
     }
+
+    public override string ToString() => name;
+    public override int GetHashCode() => name.GetHashCode();
 
   }
 }
