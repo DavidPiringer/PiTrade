@@ -12,13 +12,13 @@ using System.Text;
 using System.Web;
 
 namespace PiTrade.Exchange.Binance {
-  public sealed class BinanceExchange : IExchange {
+  public sealed class BinanceExchange : Exchange {
     private const string BaseUri = "https://api.binance.com";
+    private readonly TimeSpan UpdateInterval = TimeSpan.FromMinutes(5);
     private readonly string secret;
     private readonly HttpClient client;
     private readonly object locker = new object();
-    private readonly ConcurrentDictionary<string, IMarket> marketDict
-      = new ConcurrentDictionary<string, IMarket>();
+    private readonly IList<string> containedMarkets = new List<string>();
 
     private long ping;
     private long Ping {
@@ -26,10 +26,8 @@ namespace PiTrade.Exchange.Binance {
       set { lock (locker) { ping = value; } }
     }
 
+    private DateTime lastUpdate = DateTime.MinValue;
 
-    public event Action<IMarket>? MarketAdded;
-
-    public IEnumerable<IMarket> AvailableMarkets => marketDict.Values;
 
     public BinanceExchange(string key, string secret) {
       this.secret = secret;
@@ -37,7 +35,7 @@ namespace PiTrade.Exchange.Binance {
       client.BaseAddress = new Uri(BaseUri);
       client.Timeout = TimeSpan.FromSeconds(10);
       client.DefaultRequestHeaders.Add("X-MBX-APIKEY", key);
-      UpdateExchange().Wait();
+      Update(CancellationToken.None).Wait();
     }
 
     public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds() {
@@ -52,50 +50,41 @@ namespace PiTrade.Exchange.Binance {
       return funds;
     }
 
+    protected override async Task Update(CancellationToken cancellationToken) {
+      if(lastUpdate.Add(UpdateInterval) < DateTime.Now) {
+        lastUpdate = DateTime.Now;
+        var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
 
-    public IMarket? GetMarket(Symbol asset, Symbol quote) =>
-      AvailableMarkets.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
+        if (response != null) {
+          Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-    #region Private Methods
-    private async Task UpdateExchange() {
-      var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
+          var symbols = response.Symbols ?? Enumerable.Empty<SymbolInformation>();
+          foreach (var symbol in symbols) {
+            if (!cancellationToken.IsCancellationRequested &&
+                symbol.BaseAsset != null &&
+                symbol.QuoteAsset != null &&
+                symbol.Filters != null &&
+                symbol.IsSpotTradingAllowed.HasValue &&
+                symbol.IsSpotTradingAllowed.Value &&
+                symbol.MarketString != null &&
+                !containedMarkets.Contains(symbol.MarketString)) {
 
-      if (response != null) {
-        Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+              var assetPrecision = symbol.AssetPrecision;
+              var quotePrecision = symbol.QuotePrecision;
 
-        var symbols = response.Symbols ?? Enumerable.Empty<SymbolInformation>();
-        foreach (var symbol in symbols) {
-          if (symbol.BaseAsset != null &&
-              symbol.QuoteAsset != null &&
-              symbol.Filters != null &&
-              symbol.IsSpotTradingAllowed.HasValue &&
-              symbol.IsSpotTradingAllowed.Value &&
-              symbol.MarketString != null &&
-              !marketDict.ContainsKey(symbol.MarketString)) {
-
-            var assetPrecision = symbol.AssetPrecision;
-            var quotePrecision = symbol.QuotePrecision;
-
-            if (assetPrecision.HasValue && quotePrecision.HasValue) {
-              var market = new BinanceMarket(this, new Symbol(symbol.BaseAsset), new Symbol(symbol.QuoteAsset),
-                                             assetPrecision.Value, quotePrecision.Value);
-              if (marketDict.TryAdd(symbol.MarketString, market)) {
-                MarketAdded?.Invoke(market);
+              if (assetPrecision.HasValue && quotePrecision.HasValue) {
+                containedMarkets.Add(symbol.MarketString);
+                RegisterMarket(new BinanceMarket(this, new Symbol(symbol.BaseAsset), new Symbol(symbol.QuoteAsset),
+                                                 assetPrecision.Value, quotePrecision.Value));
               }
             }
           }
         }
       }
-      RefreshServerDeltaTime();
     }
 
-    private void RefreshServerDeltaTime() =>
-      Task.Delay(TimeSpan.FromMinutes(5))
-          .ContinueWith(r => UpdateExchange().Wait());
-    #endregion
-
     #region Internal Methods
-    internal async Task<(Order? order, ErrorState error)> NewMarketOrder(Market market, OrderSide side, decimal quantity) {
+    internal async Task<(long? orderId, ErrorState error)> NewMarketOrder(Market market, OrderSide side, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -105,10 +94,10 @@ namespace PiTrade.Exchange.Binance {
       });
       if (response == null || response.Id == -1)
         return (null, ErrorState.IdNotFound);
-      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorState.None);
+      return (response.Id, ErrorState.None);
     }
 
-    internal async Task<(Order? order, ErrorState error)> NewLimitOrder(Market market, OrderSide side, decimal price, decimal quantity) {
+    internal async Task<(long? orderId, ErrorState error)> NewLimitOrder(Market market, OrderSide side, decimal price, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -120,7 +109,7 @@ namespace PiTrade.Exchange.Binance {
       });
       if (response == null || response.Id == -1)
         return (null, ErrorState.IdNotFound);
-      return (new Order(response.Id, market, side, market.CurrentPrice, quantity), ErrorState.None);
+      return (response.Id, ErrorState.None);
     }
 
 

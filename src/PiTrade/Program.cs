@@ -7,6 +7,7 @@ using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
 using PiTrade.Strategy;
 
+
 var configPath = args.FirstOrDefault(@"C:\Users\David\Documents\binanceConfig.json");
 var config = JObject.Parse(File.ReadAllText(configPath));
 
@@ -27,19 +28,20 @@ if (commissionMarket == null) {
 }
 Strategy.CommissionMarket = commissionMarket;
 
-tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 10m, 0.01m, 0.005m, 5));
+//tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 10m, 0.01m, 0.005m, 5));
+/*
 tasks.Add(Start(exchange.GetMarket(Symbol.BTC, Symbol.USDT), 10m, 0.01m, 0.005m, 5));
 tasks.Add(Start(exchange.GetMarket(Symbol.ADA, Symbol.USDT), 10m, 0.02m, 0.005m, 5));
 tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 10m, 0.02m, 0.005m, 5));
 tasks.Add(Start(exchange.GetMarket(Symbol.LUNA, Symbol.USDT), 10m, 0.02m, 0.005m, 5));
 tasks.Add(Start(exchange.GetMarket(Symbol.ATOM, Symbol.USDT), 10m, 0.02m, 0.005m, 5));
-
+*/
 Task.WaitAll(tasks.ToArray());
 
 Task Start(IMarket? market, decimal quotePerGrid, decimal buyGridDistance, decimal sellThreshold, int buyGridCount) {
   if(market != null) {
     var strategy = new GridTradingStrategy(market, quotePerGrid, buyGridDistance, sellThreshold, buyGridCount);
-    return strategy.Run();
   }
   return Task.CompletedTask;
 }
+

@@ -33,10 +33,7 @@ namespace PiTrade.Strategy {
 
     protected Strategy(IMarket market) {
       this.Market = market;
-      market.Listen(Update);
     }
-
-    public virtual async Task Run() => await Market.Connect();
 
     protected abstract Task Update(decimal currentPrice);
 
@@ -57,7 +54,7 @@ namespace PiTrade.Strategy {
 
       if(CommissionMarket != null && tmpCommission > 15) {
         var quantity = tmpCommission / CommissionMarket.CurrentPrice;
-        await CommissionMarket.CreateMarketOrder(OrderSide.BUY, quantity);
+        CommissionMarket.CreateMarketOrder(OrderSide.BUY, quantity);
       }
     }
 

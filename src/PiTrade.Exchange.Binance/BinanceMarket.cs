@@ -25,21 +25,22 @@ namespace PiTrade.Exchange.Binance {
       webSocket = new WebSocket(new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade"));
     }
 
-    public override Task<(Order? order, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity) =>
+    public override Task<(long? orderId, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity) =>
       Exchange.NewMarketOrder(this, side, quantity);
 
-    public override Task<(Order? order, ErrorState error)> NewLimitOrder(OrderSide side, decimal price, decimal quantity) =>
+    public override Task<(long? orderId, ErrorState error)> NewLimitOrder(OrderSide side, decimal price, decimal quantity) =>
       Exchange.NewLimitOrder(this, side, price, quantity);
 
     protected async override Task<ErrorState> CancelOrder(Order order) =>
         await Exchange.Cancel(order);
 
 
-    protected override async Task<ITradeUpdate?> MarketLoopCycle(CancellationToken token) {
+    protected override async Task<ITradeUpdate?> MarketLoopCycle() {
       (string? msg, bool success) = await webSocket.NextMessage();
       if (success && msg != null)
         return JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
       return null;
     }
+
   }
 }

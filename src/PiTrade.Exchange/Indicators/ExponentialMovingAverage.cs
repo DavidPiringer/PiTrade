@@ -9,13 +9,13 @@ namespace PiTrade.Exchange.Indicators {
   public class ExponentialMovingAverage : Indicator {
     public readonly decimal smoothing;
 
-    public ExponentialMovingAverage(TimeSpan period, int maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close, decimal smoothing = 2m, bool simulateWithFirstUpdate = false)
-      : base(period, maxTicks, indicatorValueType, simulateWithFirstUpdate) {
+    public ExponentialMovingAverage(IMarket market, TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close, decimal smoothing = 2m)
+      : base(market, period, maxTicks, indicatorValueType) {
       this.smoothing = smoothing;
     }
 
     protected override decimal Calculate(decimal value) =>
-      value * (smoothing / (maxTicks + 1)) + Value * (1 - (smoothing / (maxTicks + 1)));
+      value * (smoothing / (MaxTicks + 1)) + Value * (1 - (smoothing / (MaxTicks + 1)));
     
       
   }

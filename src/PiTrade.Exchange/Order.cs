@@ -11,11 +11,11 @@ using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public class Order : IDisposable {
-    private readonly object locker = new object();
-    private readonly TaskCompletionSource fillTCS = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly CancellationTokenSource CTS = new CancellationTokenSource();
+    private readonly IList<Action<Order>> whenFilledActions = new List<Action<Order>>();
 
-    public long Id { get; }
+    public event Action<Order>? FillExecuted;
+
+    public long Id { get; private set; }
     public Market Market { get; }
     public OrderSide Side { get; }
     public decimal TargetPrice { get; }
@@ -25,59 +25,52 @@ namespace PiTrade.Exchange {
     public decimal ExecutedQuantity { get; private set; }
     public decimal AvgFillPrice { get; private set; }
     public bool IsFilled { get; private set; }
-    public bool IsCancelled => CTS.IsCancellationRequested;
+    public bool IsCancelled { get; private set; }
 
-
-    public Order(long id, Market market, OrderSide side, decimal targetPrice, decimal quantity) {
-      Id = id;
+    public Order(Task<(long? orderId, ErrorState error)> creationTask, 
+      Market market, OrderSide side, decimal targetPrice, decimal quantity) {
       Market = market;
       Side = side;
       TargetPrice = targetPrice;
       Quantity = quantity;
-      market.RegisterOrder(this);
+      market.TradeUpdate += OnTradeUpdate;
+
+      creationTask.ContinueWith(Creation);
     }
 
+    private void Creation(Task<(long? orderId, ErrorState error)> creationTask) {
+      creationTask.Wait();
+      (long? orderId, ErrorState error) = creationTask.Result;
+      if(error == ErrorState.None && orderId.HasValue)
+        Id = orderId.Value;
+    }
 
-    internal void Update(ITradeUpdate update) {
+    private void OnTradeUpdate(IMarket market, ITradeUpdate update) {
       if (update.Match(this)) {
-        // set all property values in a locked environment
-        // set the values instead of calculating them in their getter
-        // -> prevents race conditions
-        lock (locker) {
-          ExecutedQuantity += update.Quantity;
-          AvgFillPrice += update.Price * (update.Quantity / Quantity);
-          ExecutedAmount = AvgFillPrice * ExecutedQuantity;
-          Amount = AvgFillPrice * ExecutedQuantity;
-          IsFilled = Quantity <= ExecutedQuantity;
-          if (IsFilled) fillTCS.SetResult();
-        }
+        ExecutedQuantity += update.Quantity;
+        AvgFillPrice += update.Price * (update.Quantity / Quantity);
+        ExecutedAmount = AvgFillPrice * ExecutedQuantity;
+        Amount = AvgFillPrice * ExecutedQuantity;
+        IsFilled = Quantity <= ExecutedQuantity;
+        FillExecuted?.Invoke(this);
+        if (IsFilled) ExecuteWhenFilledActions();
       }
     }
 
-    public async Task Cancel() {
-      if (!IsFilled && !CTS.IsCancellationRequested) {
-        CTS.Cancel();
-        await ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
+    private void ExecuteWhenFilledActions() {
+      foreach(var fnc in whenFilledActions)
+        fnc(this);
+    }
+
+    public void Cancel() {
+      if (!IsFilled && !IsCancelled) {
+        IsCancelled = true;
+        _ = ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
       }
     }
 
-    /// <summary>
-    /// Starts a new long running task, which waits for the full execution of the order.
-    /// After the order is filled, it continues with a defined function.
-    /// </summary>
     public void WhenFilled(Action<Order> fnc) =>
-      WhenFilled(o => Task.Run(() => fnc(o)));
-
-    /// <summary>
-    /// Starts a new long running task, which waits for the full execution of the order.
-    /// After the order is filled, it continues with a defined function.
-    /// </summary>
-    public void WhenFilled(Func<Order, Task> fnc) =>
-      Task.Factory.StartNew(async () => {
-        await fillTCS.Task;
-        if(!CTS.Token.IsCancellationRequested)
-          await fnc.Invoke(this);
-      }, CTS.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+      whenFilledActions.Add(fnc);
 
     public override string ToString() =>
       $"Id = {Id}, " +
@@ -96,7 +89,7 @@ namespace PiTrade.Exchange {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
         }
-        Cancel().Wait(5000);
+        Cancel();
         disposedValue = true;
       }
     }

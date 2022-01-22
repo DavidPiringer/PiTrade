@@ -6,19 +6,24 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange.Entities {
   public class PriceCandle {
-    public decimal[] Values { get; }
+    public DateTime DateTime { get; }
     public TimeSpan Period { get; }
 
-    public decimal Open => Values.First();
-    public decimal Close => Values.Last();
-    public decimal Average => Values.Average();
-    public decimal Max => Values.Max();
-    public decimal Min => Values.Min(); 
+    public decimal Open { get; }
+    public decimal Close { get; }
+    public decimal Average { get; }
+    public decimal Max { get; }
+    public decimal Min { get; }
 
-    public PriceCandle(decimal[] values, TimeSpan period) {
+    public PriceCandle(decimal[] values, DateTime dateTime, TimeSpan period) {
       if (values == null || values.Length == 0)
         throw new ArgumentException("The value array of an price candle cannot be null or empty.");
-      Values = values;
+      Open = values.First();
+      Close = values.Last();
+      Average = values.Average();
+      Max = values.Max();
+      Min = values.Min();
+      DateTime = dateTime;
       Period = period;
     }
   }
