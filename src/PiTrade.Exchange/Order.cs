@@ -12,6 +12,7 @@ using PiTrade.Networking;
 namespace PiTrade.Exchange {
   public class Order : IDisposable {
     private readonly IList<Action<Order>> whenFilledActions = new List<Action<Order>>();
+    private readonly IList<Action<Order>> whenFaultedActions = new List<Action<Order>>();
 
     public event Action<Order>? FillExecuted;
 
@@ -26,6 +27,7 @@ namespace PiTrade.Exchange {
     public decimal AvgFillPrice { get; private set; }
     public bool IsFilled { get; private set; }
     public bool IsCancelled { get; private set; }
+    public bool IsFaulted { get; private set; }
 
     public Order(Task<(long? orderId, ErrorState error)> creationTask, 
       Market market, OrderSide side, decimal targetPrice, decimal quantity) {
@@ -41,8 +43,12 @@ namespace PiTrade.Exchange {
     private void Creation(Task<(long? orderId, ErrorState error)> creationTask) {
       creationTask.Wait();
       (long? orderId, ErrorState error) = creationTask.Result;
-      if(error == ErrorState.None && orderId.HasValue)
+      if (error == ErrorState.None && orderId.HasValue)
         Id = orderId.Value;
+      else {
+        IsFaulted = true;
+        ExecuteWhenFaultedActions();
+      }
     }
 
     private void OnTradeUpdate(IMarket market, ITradeUpdate update) {
@@ -62,6 +68,11 @@ namespace PiTrade.Exchange {
         fnc(this);
     }
 
+    private void ExecuteWhenFaultedActions() {
+      foreach (var fnc in whenFaultedActions)
+        fnc(this);
+    }
+
     public void Cancel() {
       if (!IsFilled && !IsCancelled) {
         IsCancelled = true;
@@ -69,8 +80,15 @@ namespace PiTrade.Exchange {
       }
     }
 
-    public void WhenFilled(Action<Order> fnc) =>
-      whenFilledActions.Add(fnc);
+    public void WhenFilled(Action<Order> fnc) {
+      if (IsFilled) fnc(this);
+      else whenFilledActions.Add(fnc);
+    }
+
+    public void WhenFaulted(Action<Order> fnc) {
+      if (!IsFaulted) fnc(this);
+      else whenFaultedActions.Add(fnc);
+    }
 
     public override string ToString() =>
       $"Id = {Id}, " +
@@ -89,6 +107,7 @@ namespace PiTrade.Exchange {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
         }
+        Market.TradeUpdate -= OnTradeUpdate;
         Cancel();
         disposedValue = true;
       }

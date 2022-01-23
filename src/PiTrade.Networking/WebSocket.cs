@@ -45,13 +45,13 @@ namespace PiTrade.Networking {
      * TODO: SendMessage()
      */
 
-    private async Task Connect() {
+    public async Task Connect() {
       Socket = new ClientWebSocket();
       CTS = new CancellationTokenSource();
       await Socket.ConnectAsync(uri, CTS.Token);
     }
 
-    private async Task Disconnect() {
+    public async Task Disconnect() {
       if(Socket != null) {
         if (Socket.State == WebSocketState.Open && CTS != null) {
           CTS.CancelAfter(TimeSpan.FromSeconds(2));

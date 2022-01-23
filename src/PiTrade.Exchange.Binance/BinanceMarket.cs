@@ -34,6 +34,15 @@ namespace PiTrade.Exchange.Binance {
     protected async override Task<ErrorState> CancelOrder(Order order) =>
         await Exchange.Cancel(order);
 
+    protected override void Connect() {
+      base.Connect();
+      webSocket.Connect().Wait();
+    }
+
+    protected override void Disconnect() {
+      base.Disconnect();
+      webSocket.Disconnect().Wait();
+    }
 
     protected override async Task<ITradeUpdate?> MarketLoopCycle() {
       (string? msg, bool success) = await webSocket.NextMessage();
