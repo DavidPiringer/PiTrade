@@ -21,7 +21,7 @@ if (key == null || secret == null)
 var exchange = new BinanceExchange(key, secret);
 var market = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
 if(market != null) {
-  var strategy = new GridTradingStrategy(market, 10.0m, 0.005m, 0.01m, 5);
+  var strategy = new GridTradingStrategy(market, 10.0m, 2600m, 2400m, 10, 0.005m);
 
 }
 

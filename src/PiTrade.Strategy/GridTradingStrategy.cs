@@ -38,6 +38,8 @@ namespace PiTrade.Strategy {
     private readonly decimal sellThreshold;
     private readonly IEnumerable<Grid> grids;
 
+    private decimal LastPrice { get; set; } = decimal.MinValue;
+
          
     // TODO: add "WhenError" for orders -> put order creation on market into order
     // TODO: add "HandleCommission" for market -> handles commission and maybe change quantity of order
@@ -53,12 +55,12 @@ namespace PiTrade.Strategy {
                            .Select(x => new Grid(x));
     }
 
-    public void Start() {
+    public void Enable() {
       IsEnabled = true;
       market.PriceChanged += OnPriceChanged;
     }
 
-    public void Stop(bool sellAll = true) {
+    public void Disable(bool sellAll = true) {
       IsEnabled = false;
       market.PriceChanged -= OnPriceChanged;
 
@@ -83,7 +85,9 @@ namespace PiTrade.Strategy {
     private void OnPriceChanged(IMarket market, decimal price) {
       if(!IsEnabled) return;
 
-      var hits = grids.Where(x => x.Price >= price && x.BuyOrder == null && x.SellOrder == null);
+
+      var hits = grids.Where(x => LastPrice >= x.Price && x.Price >= price && x.BuyOrder == null && x.SellOrder == null);
+      LastPrice = price;
       if (hits.Any()) Buy(market, price, hits);
     }
 
