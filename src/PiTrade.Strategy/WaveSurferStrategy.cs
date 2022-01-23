@@ -13,7 +13,8 @@ using PiTrade.Logging;
 using PiTrade.Strategy.Util;
 
 namespace PiTrade.Strategy {
-  public class WaveSurferStrategy : Strategy {
+  public class WaveSurferStrategy /*: Strategy*/ {
+    /*
     private const decimal UpperThreshold = 0.0025m;
     private const decimal LowerThreshold = 0.0025m;
 
@@ -139,5 +140,7 @@ namespace PiTrade.Strategy {
       if(!emergencyStop)
         State = PrepareBuy;
     }
+
+    */
   }
 }

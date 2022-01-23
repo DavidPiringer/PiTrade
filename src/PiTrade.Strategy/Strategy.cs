@@ -35,7 +35,7 @@ namespace PiTrade.Strategy {
       this.Market = market;
     }
 
-    protected abstract Task Update(decimal currentPrice);
+    //protected abstract Task Update(decimal currentPrice);
 
     protected async Task AddFilledOrder(Order order) {
       //orders.TryAdd(order.GetHashCode(), order);

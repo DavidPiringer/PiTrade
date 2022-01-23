@@ -19,14 +19,25 @@ if (key == null || secret == null)
 
 
 var exchange = new BinanceExchange(key, secret);
+var market = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
+if(market != null) {
+  var strategy = new GridTradingStrategy(market, 10.0m, 0.005m, 0.01m, 5);
+
+}
+
+
+
+exchange.Run(CancellationToken.None);
+
+
 var tasks = new List<Task>();
 
-var commissionMarket = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
-if (commissionMarket == null) {
-  Log.Error("Commission Market is null.");
-  return;
-}
-Strategy.CommissionMarket = commissionMarket;
+//var commissionMarket = exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+//if (commissionMarket == null) {
+//  Log.Error("Commission Market is null.");
+//  return;
+//}
+//Strategy.CommissionMarket = commissionMarket;
 
 //tasks.Add(Start(exchange.GetMarket(Symbol.ETH, Symbol.USDT), 10m, 0.01m, 0.005m, 5));
 /*
@@ -36,7 +47,7 @@ tasks.Add(Start(exchange.GetMarket(Symbol.SOL, Symbol.USDT), 10m, 0.02m, 0.005m,
 tasks.Add(Start(exchange.GetMarket(Symbol.LUNA, Symbol.USDT), 10m, 0.02m, 0.005m, 5));
 tasks.Add(Start(exchange.GetMarket(Symbol.ATOM, Symbol.USDT), 10m, 0.02m, 0.005m, 5));
 */
-Task.WaitAll(tasks.ToArray());
+//Task.WaitAll(tasks.ToArray());
 
 Task Start(IMarket? market, decimal quotePerGrid, decimal buyGridDistance, decimal sellThreshold, int buyGridCount) {
   if(market != null) {

@@ -12,13 +12,11 @@ using PiTrade.Strategy.Util;
 namespace PiTrade.Strategy {
   // https://www.investopedia.com/terms/g/grid-trading.asp
   /// <summary>
-  /// This strategy copies the Against-The-Trend Grid Trading strategy but 
-  /// it creates only a buy order grid. Everytime a buy order is triggered
-  /// it creates a sell order with a certain threshold above the avg. price
-  /// of the buy order. Additionally, it holds the buys if a strong down-trend
-  /// is occuring.
+  /// This strategy copies the Against-The-Trend Grid Trading strategy. 
+  /// Everytime a buy order is triggered it creates a sell order with a 
+  /// certain threshold above the avg. price of the buy order.
   /// </summary>
-  public class GridTradingStrategy : Strategy {
+  public class GridTradingStrategy {
     private class Grid {
       public decimal Price { get; set; }
       public Order? BuyOrder { get; set; }
@@ -30,43 +28,122 @@ namespace PiTrade.Strategy {
       }
     }
 
-    private readonly int buyGridCount;
+    public event Action<decimal>? Profit;
+    public event Action<decimal>? Commission;
+
+    public bool IsEnabled { get; private set; }
+
+    private readonly IMarket market;
     private readonly decimal quotePerGrid;
     private readonly decimal sellThreshold;
-    private readonly decimal buyGridDistance;
-    private readonly IIndicator indicator;
-    private readonly IList<Grid> grids;
-    private readonly IList<Order> emergencySells;
+    private readonly IEnumerable<Grid> grids;
 
-    private Func<decimal, Task>? State { get; set; }
-
-    private decimal ResetUpPrice { get; set; }
-    private decimal ResetLowPrice { get; set; }
          
     // TODO: add "WhenError" for orders -> put order creation on market into order
     // TODO: add "HandleCommission" for market -> handles commission and maybe change quantity of order
 
     // TODO: overseer strategy -> watches all markets -> good uptrends -> start grid trading
-    // TODO: add stop method
 
-    public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal sellThreshold, decimal buyGridDistance, int buyGridCount) : base(market) {
-      this.buyGridCount = buyGridCount;
+    public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal highPrice, decimal lowPrice, uint gridCount, decimal sellThreshold) /*: base(market)*/ {
+      this.market = market;
       this.quotePerGrid = quotePerGrid;
       this.sellThreshold = sellThreshold;
-      this.buyGridDistance = buyGridDistance;
-      this.grids = new List<Grid>();
-      this.emergencySells = new List<Order>();
 
-      indicator = new ExponentialMovingAverage(TimeSpan.FromMinutes(1), 30, IndicatorValueType.Average, simulateWithFirstUpdate: false);
-      Market.AddIndicator(indicator);
-      State = Initialize;
+      this.grids = NumSpace.Linear(highPrice, lowPrice, gridCount)
+                           .Select(x => new Grid(x));
     }
 
+    public void Start() {
+      IsEnabled = true;
+      market.PriceChanged += OnPriceChanged;
+    }
+
+    public void Stop(bool sellAll = true) {
+      IsEnabled = false;
+      market.PriceChanged -= OnPriceChanged;
+
+      if (sellAll) {
+        decimal restQuantity = 0m;
+        foreach (var grid in grids) {
+          restQuantity += GetRestQuantityAndCancel(grid.BuyOrder);
+          restQuantity += GetRestQuantityAndCancel(grid.SellOrder);
+        }
+        market.CreateMarketOrder(OrderSide.SELL, restQuantity);
+      }
+    }
+
+    private decimal GetRestQuantityAndCancel(Order? order) {
+      if (order != null && !order.IsFilled && !order.IsFaulted) {
+        order.Cancel();
+        return order.ExecutedQuantity;
+      }
+      return 0m;
+    }
+
+    private void OnPriceChanged(IMarket market, decimal price) {
+      if(!IsEnabled) return;
+
+      var hits = grids.Where(x => x.Price >= price && x.BuyOrder == null && x.SellOrder == null);
+      if (hits.Any()) Buy(market, price, hits);
+    }
+
+    private void Buy(IMarket market, decimal price, IEnumerable<Grid> hits) {
+      var hitCount = hits.Count();
+      var quantity = GetQuantity(price) * hitCount;
+
+      // adjust quantity to be greater or equal the quotePerGrid
+      while (price * quantity < quotePerGrid) quantity *= 1.001m;
+
+      var order = market.CreateLimitOrder(OrderSide.BUY, price, quantity);
+      foreach(var hit in hits)
+        hit.BuyOrder = order;
+      order.WhenFilled(o => {
+        AddCommission(o);
+        Sell(market, o, hits);
+      });
+
+      order.WhenFaulted(o => {
+        foreach (var hit in hits)
+          hit.BuyOrder = null;
+      });
+    }
+
+    private void Sell(IMarket market, Order buyOrder, IEnumerable<Grid> hits) {
+      var price = GetSellPrice(buyOrder.AvgFillPrice);
+      var quantity = buyOrder.Quantity;
+
+
+      // adjust price to be greater or equal the quotePerGrid
+      while (price * quantity < quotePerGrid) price *= 1.001m;
+
+      var order = market.CreateLimitOrder(OrderSide.SELL, price, quantity);
+      foreach (var hit in hits)
+        hit.SellOrder = order;
+
+      order.WhenFilled(o => {
+        AddCommission(o);
+        Profit?.Invoke(o.Amount - buyOrder.Amount);
+      });
+
+      order.WhenFaulted(o => {
+        foreach (var hit in hits)
+          hit.SellOrder = null;
+      });
+
+    }
+
+    private void AddCommission(Order order) {
+      Commission?.Invoke(order.Amount * 0.0075m);
+    }
+    private decimal GetQuantity(decimal price) => quotePerGrid / price;
+    private decimal GetSellPrice(decimal price) => price * (1m + sellThreshold);
+
+    /*
     protected override async Task Update(decimal currentPrice) {
       if (State != null)
         await State(currentPrice);
-    }
-
+    }*/
+    /*
     private async Task Initialize(decimal currentPrice) {
       await Task.CompletedTask; // need because of the Task return type
 
@@ -218,8 +295,7 @@ namespace PiTrade.Strategy {
 
       Log.Info($"[{Market.Asset}{Market.Quote}] Profit = {revenue - commission}");
     }
-
-    private decimal GetQuantity(decimal price) => quotePerGrid / price;
-    private decimal GetSellPrice(decimal price) => price * (1m + sellThreshold);
+    
+    */
   }
 }
