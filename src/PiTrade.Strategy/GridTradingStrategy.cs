@@ -28,14 +28,25 @@ namespace PiTrade.Strategy {
       }
     }
 
-    public event Action<decimal>? Profit;
-    public event Action<decimal>? Commission;
+    public event Action<GridTradingStrategy, decimal>? Profit;
+    public event Action<GridTradingStrategy, decimal>? Commission;
+    public event Action<GridTradingStrategy, bool>? EnableChanged;
 
-    public bool IsEnabled { get; private set; }
+    private bool isEnabled;
+    public bool IsEnabled { 
+      get => isEnabled;
+      private set {
+        isEnabled = value;
+        EnableChanged?.Invoke(this, value);
+      }
+    }
 
     private readonly IMarket market;
     private readonly decimal quotePerGrid;
+    private readonly decimal highPrice;
+    private readonly decimal lowPrice;
     private readonly decimal sellThreshold;
+    private readonly bool autoDisable;
     private readonly IEnumerable<Grid> grids;
 
     private decimal LastPrice { get; set; } = decimal.MinValue;
@@ -46,10 +57,13 @@ namespace PiTrade.Strategy {
 
     // TODO: overseer strategy -> watches all markets -> good uptrends -> start grid trading
 
-    public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal highPrice, decimal lowPrice, uint gridCount, decimal sellThreshold) /*: base(market)*/ {
+    public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal highPrice, decimal lowPrice, uint gridCount, decimal sellThreshold, bool autoDisable = true) /*: base(market)*/ {
       this.market = market;
       this.quotePerGrid = quotePerGrid;
+      this.highPrice = highPrice;
+      this.lowPrice = lowPrice;
       this.sellThreshold = sellThreshold;
+      this.autoDisable = autoDisable;
 
       this.grids = NumSpace.Linear(highPrice, lowPrice, gridCount)
                            .Select(x => new Grid(x));
@@ -85,6 +99,8 @@ namespace PiTrade.Strategy {
     private void OnPriceChanged(IMarket market, decimal price) {
       if(!IsEnabled) return;
 
+      if (autoDisable && (price > highPrice || lowPrice > price))
+        Disable();
 
       var hits = grids.Where(x => LastPrice >= x.Price && x.Price >= price && x.BuyOrder == null && x.SellOrder == null);
       LastPrice = price;
@@ -126,7 +142,7 @@ namespace PiTrade.Strategy {
 
       order.WhenFilled(o => {
         AddCommission(o);
-        Profit?.Invoke(o.Amount - buyOrder.Amount);
+        Profit?.Invoke(this, o.Amount - buyOrder.Amount);
       });
 
       order.WhenFaulted(o => {
@@ -137,7 +153,7 @@ namespace PiTrade.Strategy {
     }
 
     private void AddCommission(Order order) {
-      Commission?.Invoke(order.Amount * 0.0075m);
+      Commission?.Invoke(this, order.Amount * 0.0075m);
     }
     private decimal GetQuantity(decimal price) => quotePerGrid / price;
     private decimal GetSellPrice(decimal price) => price * (1m + sellThreshold);
