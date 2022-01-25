@@ -10,17 +10,17 @@ using PiTrade.Networking;
 namespace PiTrade.Exchange {
   public abstract class Market : IMarket {
     private readonly string name;
+    private readonly IList<Func<IMarket, ITradeUpdate, Task>> tradeUpdateFncs = new List<Func<IMarket, ITradeUpdate, Task>>();
+    private readonly IList<Func<IMarket, decimal, Task>> priceChangedFncs = new List<Func<IMarket, decimal, Task>>();
 
-    private event Action<IMarket, ITradeUpdate>? _TradeUpdate;
-    public event Action<IMarket, ITradeUpdate>? TradeUpdate {
-      add { Connect(); _TradeUpdate += value; }
-      remove { Disconnect(); _TradeUpdate -= value; }
+    public event Func<IMarket, ITradeUpdate, Task> TradeUpdate {
+      add { Connect(); tradeUpdateFncs.Add(value); }
+      remove { tradeUpdateFncs.Remove(value); Disconnect(); }
     }
 
-    private event Action<IMarket, decimal>? _PriceChanged;
-    public event Action<IMarket, decimal>? PriceChanged {
-      add { Connect(); _PriceChanged += value; }
-      remove { Disconnect(); _PriceChanged -= value; }
+    public event Func<IMarket, decimal, Task> PriceChanged {
+      add { Connect(); priceChangedFncs.Add(value); }
+      remove { priceChangedFncs.Remove(value); Disconnect(); }
     }
 
     public IExchange Exchange { get; }
@@ -31,8 +31,6 @@ namespace PiTrade.Exchange {
     public decimal CurrentPrice { get; private set; }
 
     public bool IsEnabled { get; private set; }
-      //(TradeUpdate != null && TradeUpdate.GetInvocationList().Length > 0) || 
-      //(PriceChanged != null && PriceChanged.GetInvocationList().Length > 0); 
 
     public Market(Exchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision) {
       name = $"{exchange}-{asset}{quote}";
@@ -43,34 +41,59 @@ namespace PiTrade.Exchange {
       QuotePrecision = quotePrecision;
     }
 
-    public Order CreateMarketOrder(OrderSide side, decimal quantity) {
-      Connect();
+    public async Task<(Order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity) {
       var qty = quantity.RoundDown(AssetPrecision);
-      return new Order(NewMarketOrder(side, qty), this, side, CurrentPrice, qty);
+      var price = CurrentPrice;
+      long? orderId = null; 
+      ErrorState error = ErrorState.NotConnected;
+      if(IsEnabled) (orderId, error) = await NewMarketOrder(side, qty);
+      return (new Order(orderId, this, side, price, qty), error);
     }
     public abstract Task<(long? orderId, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity);
 
-    public Order CreateLimitOrder(OrderSide side, decimal price, decimal quantity) {
-      Connect();
+    public async Task<(Order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity) {
       var p = price.RoundDown(QuotePrecision);
       var qty = quantity.RoundDown(AssetPrecision);
-      return new Order(NewLimitOrder(side, p, qty), this, side, p, qty);
+      long? orderId = null;
+      ErrorState error = ErrorState.NotConnected;
+      if (IsEnabled) (orderId, error) = await NewLimitOrder(side, p, qty);
+      return (new Order(orderId, this, side, price, qty), error);
     }
     public abstract Task<(long? orderId, ErrorState error)> NewLimitOrder(OrderSide side, decimal price, decimal quantity);
 
     protected internal abstract Task<ErrorState> CancelOrder(Order order);
     protected abstract Task<ITradeUpdate?> MarketLoopCycle();
 
-    protected virtual void Connect() {
+    //internal void RegisterOrder(Order order) => openOrders.Add(order);
+
+    //internal void UnregisterOrder(Order order) => openOrders.Remove(order);
+
+    public void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc) {
+      tradeUpdateFncs.Add(fnc);
+    }
+
+    public void Unregister2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc) {
+      tradeUpdateFncs.Remove(fnc);
+    }
+     
+
+    public void Register2PriceChanges(Func<IMarket, decimal, Task> fnc) {
+      priceChangedFncs.Add(fnc);
+    }
+
+    public void Unregister2PriceChanges(Func<IMarket, decimal, Task> fnc) {
+      priceChangedFncs.Remove(fnc);
+    }
+
+    protected internal virtual async Task Connect() {
       if (IsEnabled) return;
       IsEnabled = true;
+      await Task.CompletedTask;
     }
-    protected virtual void Disconnect() {
-      if (!IsEnabled && _PriceChanged != null && 
-        _PriceChanged.GetInvocationList().Length > 0) 
-        return;
-
+    protected internal virtual async Task Disconnect() {
+      if (!IsEnabled) return;
       IsEnabled = false;
+      await Task.CompletedTask;
     }
 
     public override string ToString() => name;
@@ -78,15 +101,17 @@ namespace PiTrade.Exchange {
 
     internal async Task Update() {
       if(!IsEnabled) return;
-      Log.Info(name);
+
       var update = await MarketLoopCycle();
       if (update != null) {
         // update only if price has changed
         if (CurrentPrice != update.Price) {
           CurrentPrice = update.Price;
-          _PriceChanged?.Invoke(this, update.Price);
+          foreach (var priceChangedFnc in priceChangedFncs.ToArray())
+            await priceChangedFnc(this, update.Price);
         }
-        _TradeUpdate?.Invoke(this, update);
+        foreach (var tradeUpdateFnc in tradeUpdateFncs.ToArray())
+          await tradeUpdateFnc(this, update);
       }
     }
   }

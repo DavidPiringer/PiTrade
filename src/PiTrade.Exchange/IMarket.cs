@@ -9,17 +9,20 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange {
   public interface IMarket {
-    event Action<IMarket, ITradeUpdate>? TradeUpdate;
-    event Action<IMarket, decimal>? PriceChanged;
-
     decimal CurrentPrice { get; }
     IExchange Exchange { get; }
     Symbol Asset { get; }
     Symbol Quote { get; }
     int AssetPrecision { get; }
     int QuotePrecision { get; }
-    Order CreateMarketOrder(OrderSide side, decimal quantity);
-    Order CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+    Task<(Order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity);
+    Task<(Order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+
+    void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
+    void Unregister2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
+
+    void Register2PriceChanges(Func<IMarket, decimal, Task> fnc);
+    void Unregister2PriceChanges(Func<IMarket, decimal, Task> fnc);
 
   }
 }

@@ -11,6 +11,6 @@ namespace PiTrade.Exchange {
     IEnumerable<IMarket> AvailableMarkets { get; }
     IMarket? GetMarket(Symbol asset, Symbol quote);
 
-    public void Run(CancellationToken cancellationToken);
+    public Task Run(CancellationToken cancellationToken);
   }
 }

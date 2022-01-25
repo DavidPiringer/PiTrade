@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange;
 using PiTrade.Exchange.Enums;
+using PiTrade.Exchange.Extensions;
 using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
 using PiTrade.Strategy.Util;
@@ -21,6 +22,7 @@ namespace PiTrade.Strategy {
       public decimal Price { get; set; }
       public Order? BuyOrder { get; set; }
       public Order? SellOrder { get; set; }
+      private Grid() { }
       public Grid(decimal price) : this(price, null) { }
       public Grid(decimal price, Order? order) {
         Price = price;
@@ -47,7 +49,7 @@ namespace PiTrade.Strategy {
     private readonly decimal lowPrice;
     private readonly decimal sellThreshold;
     private readonly bool autoDisable;
-    private readonly IEnumerable<Grid> grids;
+    private readonly Grid[] grids;
 
     private decimal LastPrice { get; set; } = decimal.MinValue;
 
@@ -66,89 +68,111 @@ namespace PiTrade.Strategy {
       this.autoDisable = autoDisable;
 
       this.grids = NumSpace.Linear(highPrice, lowPrice, gridCount)
-                           .Select(x => new Grid(x));
+                           .Select(x => new Grid(x)).ToArray();
+      foreach (var grid in grids)
+        Log.Info($"[{market.Asset}{market.Quote}] grid = {grid.Price}");
     }
 
     public void Enable() {
       IsEnabled = true;
-      market.PriceChanged += OnPriceChanged;
+      market.Register2PriceChanges(OnPriceChanged);
     }
 
-    public void Disable(bool sellAll = true) {
+    public async Task Disable(bool sellAll = true) {
       IsEnabled = false;
-      market.PriceChanged -= OnPriceChanged;
+      market.Unregister2PriceChanges(OnPriceChanged);
 
       if (sellAll) {
         decimal restQuantity = 0m;
         foreach (var grid in grids) {
-          restQuantity += GetRestQuantityAndCancel(grid.BuyOrder);
-          restQuantity += GetRestQuantityAndCancel(grid.SellOrder);
+          restQuantity += await GetRestQuantityAndCancel(grid.BuyOrder);
+          restQuantity += await GetRestQuantityAndCancel(grid.SellOrder);
         }
-        market.CreateMarketOrder(OrderSide.SELL, restQuantity);
+
+        if(restQuantity > 0)
+          await market.CreateMarketOrder(OrderSide.SELL, restQuantity);
       }
     }
 
-    private decimal GetRestQuantityAndCancel(Order? order) {
+    private async Task<decimal> GetRestQuantityAndCancel(Order? order) {
       if (order != null && !order.IsFilled && !order.IsFaulted) {
-        order.Cancel();
+        await order.Cancel();
         return order.ExecutedQuantity;
       }
       return 0m;
     }
 
-    private void OnPriceChanged(IMarket market, decimal price) {
+    private async Task OnPriceChanged(IMarket market, decimal price) {
       if(!IsEnabled) return;
 
       if (autoDisable && (price > highPrice || lowPrice > price))
-        Disable();
+        await Disable();
 
-      var hits = grids.Where(x => LastPrice >= x.Price && x.Price >= price && x.BuyOrder == null && x.SellOrder == null);
+      var hits = grids.Where(x => 
+        LastPrice > x.Price && 
+        x.Price >= price && 
+        x.BuyOrder == null && 
+        x.SellOrder == null).ToArray();
+
       LastPrice = price;
-      if (hits.Any()) Buy(market, price, hits);
+      if (hits.Any()) await Buy(market, price, hits);
+      
     }
 
-    private void Buy(IMarket market, decimal price, IEnumerable<Grid> hits) {
+    private async Task Buy(IMarket market, decimal price, IEnumerable<Grid> hits) {
+      Log.Info($"[{market.Asset}{market.Quote}] BUY (price = {price})");
+
       var hitCount = hits.Count();
       var quantity = GetQuantity(price) * hitCount;
 
       // adjust quantity to be greater or equal the quotePerGrid
-      while (price * quantity < quotePerGrid) quantity *= 1.001m;
+      while (price.RoundDown(market.QuotePrecision) * quantity.RoundDown(market.AssetPrecision) < quotePerGrid) 
+        quantity *= 1.001m;
 
-      var order = market.CreateLimitOrder(OrderSide.BUY, price, quantity);
-      foreach(var hit in hits)
+      (Order order, ErrorState error) = await market.CreateLimitOrder(OrderSide.BUY, price, quantity);
+      foreach(var hit in hits) {
         hit.BuyOrder = order;
-      order.WhenFilled(o => {
-        AddCommission(o);
-        Sell(market, o, hits);
-      });
 
+      }
+      await order.WhenFilled(async o => {
+        AddCommission(o);
+        await Sell(market, o, hits);
+      });
+      /*
       order.WhenFaulted(o => {
         foreach (var hit in hits)
           hit.BuyOrder = null;
-      });
+      });*/
     }
 
-    private void Sell(IMarket market, Order buyOrder, IEnumerable<Grid> hits) {
+    private async Task Sell(IMarket market, Order buyOrder, IEnumerable<Grid> hits) {
+      Log.Info($"[{market.Asset}{market.Quote}] SELL");
+
       var price = GetSellPrice(buyOrder.AvgFillPrice);
       var quantity = buyOrder.Quantity;
 
 
-      // adjust price to be greater or equal the quotePerGrid
-      while (price * quantity < quotePerGrid) price *= 1.001m;
+      // adjust quantity to be greater or equal the quotePerGrid
+      while (price.RoundDown(market.QuotePrecision) * quantity.RoundDown(market.AssetPrecision) < quotePerGrid)
+        price *= 1.001m;
 
-      var order = market.CreateLimitOrder(OrderSide.SELL, price, quantity);
+      (Order order, ErrorState error) = await market.CreateLimitOrder(OrderSide.SELL, price, quantity);
       foreach (var hit in hits)
         hit.SellOrder = order;
 
-      order.WhenFilled(o => {
+      await order.WhenFilled(o => {
+        foreach (var hit in hits) {
+          hit.BuyOrder = null;
+          hit.SellOrder = null;
+        }
         AddCommission(o);
         Profit?.Invoke(this, o.Amount - buyOrder.Amount);
       });
-
+      /*
       order.WhenFaulted(o => {
         foreach (var hit in hits)
           hit.SellOrder = null;
-      });
+      });*/
 
     }
 

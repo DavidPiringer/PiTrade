@@ -9,8 +9,8 @@ namespace PiTrade.Strategy.Util {
     public static IEnumerable<decimal> Linear(decimal start, decimal end, uint count) {
       var s = Math.Max(start, end);
       var e = Math.Min(start, end);
-      var stepSize = (s - e) / count;
-      for (decimal i = s; i > e; i -= stepSize)
+      var stepSize = (s - e) / (count + 2);
+      for (decimal i = (s - stepSize); i > (e + stepSize); i -= stepSize)
         yield return i;
     }
   }

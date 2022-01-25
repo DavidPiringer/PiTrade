@@ -28,12 +28,12 @@ namespace PiTrade.Exchange.Indicators {
       MaxTicks = maxTicks;
       Period = period;
 
-      market.PriceChanged += OnPriceUpdate;
+      market.Register2PriceChanges(OnPriceUpdate);
     }
 
     protected abstract decimal Calculate(decimal value);
 
-    private void OnPriceUpdate(IMarket market, decimal price) {
+    private async Task OnPriceUpdate(IMarket market, decimal price) {
       // set lastPrice to price for initialization
       if (lastPrice == decimal.MinValue) lastPrice = price;
 
@@ -58,6 +58,8 @@ namespace PiTrade.Exchange.Indicators {
 
       // add price to current period
       currentPeriod.Add(price);
+
+      await Task.CompletedTask;
     }
 
     private decimal Aggregate(PriceCandle candle) =>

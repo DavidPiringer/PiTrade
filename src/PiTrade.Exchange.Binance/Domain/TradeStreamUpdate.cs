@@ -16,6 +16,6 @@ namespace PiTrade.Exchange.Binance.Domain {
     [JsonProperty(PropertyName = "a")]
     public long OIDSeller { get; set; }
 
-    public bool Match(Order order) => order.Id == OIDSeller || order.Id == OIDBuyer;
+    public bool Match(long id) => id == OIDSeller || id == OIDBuyer;
   }
 }

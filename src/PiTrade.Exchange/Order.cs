@@ -11,12 +11,10 @@ using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public class Order : IDisposable {
-    private readonly IList<Action<Order>> whenFilledActions = new List<Action<Order>>();
-    private readonly IList<Action<Order>> whenFaultedActions = new List<Action<Order>>();
+    private readonly IList<Func<Order, Task>> whenFilledActions = new List<Func<Order, Task>>();
+    private readonly IList<Func<Order, Task>> whenFaultedActions = new List<Func<Order, Task>>();
 
-    public event Action<Order>? FillExecuted;
-
-    public long Id { get; private set; }
+    public long? Id { get; private set; }
     public Market Market { get; }
     public OrderSide Side { get; }
     public decimal TargetPrice { get; }
@@ -29,65 +27,53 @@ namespace PiTrade.Exchange {
     public bool IsCancelled { get; private set; }
     public bool IsFaulted { get; private set; }
 
-    public Order(Task<(long? orderId, ErrorState error)> creationTask, 
-      Market market, OrderSide side, decimal targetPrice, decimal quantity) {
+    internal Order(long? orderId, Market market, OrderSide side, decimal targetPrice, decimal quantity) {
+      Id = orderId;
       Market = market;
       Side = side;
       TargetPrice = targetPrice;
       Quantity = quantity;
-      market.TradeUpdate += OnTradeUpdate;
-
-      creationTask.ContinueWith(Creation);
+      market.Register2TradeUpdates(OnTradeUpdate);
     }
 
-    private void Creation(Task<(long? orderId, ErrorState error)> creationTask) {
-      creationTask.Wait();
-      (long? orderId, ErrorState error) = creationTask.Result;
-      if (error == ErrorState.None && orderId.HasValue)
-        Id = orderId.Value;
-      else {
-        IsFaulted = true;
-        ExecuteWhenFaultedActions();
-      }
-    }
-
-    private void OnTradeUpdate(IMarket market, ITradeUpdate update) {
-      if (update.Match(this)) {
+    internal async Task OnTradeUpdate(IMarket market, ITradeUpdate update) {
+      if (Id.HasValue && update.Match(Id.Value)) {
         ExecutedQuantity += update.Quantity;
         AvgFillPrice += update.Price * (update.Quantity / Quantity);
         ExecutedAmount = AvgFillPrice * ExecutedQuantity;
         Amount = AvgFillPrice * ExecutedQuantity;
         IsFilled = Quantity <= ExecutedQuantity;
-        FillExecuted?.Invoke(this);
-        if (IsFilled) ExecuteWhenFilledActions();
+        if (IsFilled) {
+          await ExecuteWhenFilledActions();
+          market.Unregister2TradeUpdates(OnTradeUpdate);
+        }
       }
     }
 
-    private void ExecuteWhenFilledActions() {
+    private async Task ExecuteWhenFilledActions() {
       foreach(var fnc in whenFilledActions)
-        fnc(this);
+        await fnc(this);
+      whenFilledActions.Clear();
+      Market.TradeUpdate -= OnTradeUpdate;
     }
 
-    private void ExecuteWhenFaultedActions() {
-      foreach (var fnc in whenFaultedActions)
-        fnc(this);
-    }
-
-    public void Cancel() {
+    public async Task Cancel() {
       if (!IsFilled && !IsCancelled) {
         IsCancelled = true;
-        _ = ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
+        Market.Unregister2TradeUpdates(OnTradeUpdate);
+        await ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
       }
     }
 
-    public void WhenFilled(Action<Order> fnc) {
-      if (IsFilled) fnc(this);
-      else whenFilledActions.Add(fnc);
-    }
+    public async Task WhenFilled(Action<Order> fnc) => 
+      await WhenFilled(async o => {
+        fnc(o);
+        await Task.CompletedTask;
+      });
 
-    public void WhenFaulted(Action<Order> fnc) {
-      if (!IsFaulted) fnc(this);
-      else whenFaultedActions.Add(fnc);
+    public async Task WhenFilled(Func<Order, Task> fnc) {
+      if (IsFilled) await fnc(this);
+      else whenFilledActions.Add(fnc);
     }
 
     public override string ToString() =>
@@ -107,8 +93,8 @@ namespace PiTrade.Exchange {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
         }
-        Market.TradeUpdate -= OnTradeUpdate;
-        Cancel();
+        Log.Info($"Dispose Order {GetHashCode()}");
+        Cancel().Wait(5000);
         disposedValue = true;
       }
     }

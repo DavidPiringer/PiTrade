@@ -41,21 +41,32 @@ namespace PiTrade.Networking {
       }
     }
 
-    /*
-     * TODO: SendMessage()
-     */
+    public async Task SendMessage(string message) {
+      try {
+        if (Socket == null || CTS == null || Socket.State != WebSocketState.Open)
+          await Connect();
 
-    public async Task Connect() {
+        if (Socket != null && CTS != null) {
+          byte[] sendBytes = Encoding.UTF8.GetBytes(message);
+          var sendBuffer = new ArraySegment<byte>(sendBytes);
+          await Socket.SendAsync(sendBuffer, WebSocketMessageType.Text, true, CTS.Token);
+        }
+      } catch (Exception ex) {
+        Log.Error($"{ex.GetType().Name} - {ex.Message}");
+      }
+    }
+
+    private async Task Connect() {
       Socket = new ClientWebSocket();
       CTS = new CancellationTokenSource();
       await Socket.ConnectAsync(uri, CTS.Token);
     }
 
-    public async Task Disconnect() {
+    private async Task Disconnect() {
       if(Socket != null) {
         if (Socket.State == WebSocketState.Open && CTS != null) {
           CTS.CancelAfter(TimeSpan.FromSeconds(2));
-          await Socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
+          //await Socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
           await Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
         }
         Socket.Dispose();

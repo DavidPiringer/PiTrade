@@ -13,16 +13,14 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange.Binance {
   internal class BinanceMarket : Market {
-    private readonly WebSocket webSocket;
-
-
+    private static readonly WebSocket webSocket = 
+      new WebSocket(new Uri($"wss://stream.binance.com:9443/ws"));
 
     public new BinanceExchange Exchange { get; }
 
     internal BinanceMarket(BinanceExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision)
       : base(exchange, asset, quote, assetPrecision, quotePrecision) {
       Exchange = exchange;
-      webSocket = new WebSocket(new Uri($"wss://stream.binance.com:9443/ws/{$"{Asset}{Quote}".ToLower()}@trade"));
     }
 
     public override Task<(long? orderId, ErrorState error)> NewMarketOrder(OrderSide side, decimal quantity) =>
@@ -34,14 +32,20 @@ namespace PiTrade.Exchange.Binance {
     protected async override Task<ErrorState> CancelOrder(Order order) =>
         await Exchange.Cancel(order);
 
-    protected override void Connect() {
-      base.Connect();
-      webSocket.Connect().Wait();
+    protected override async Task Connect() {
+      await base.Connect();
+      await webSocket.SendMessage(
+        "{" +
+          "\"method\":\"SUBSCRIBE\"," +
+          "\"params\": [ " +
+            "\"" + $"{Asset}{Quote}".ToLower() + "@trade\"" +
+          "]," +
+          "\"id\":1" +
+        "}");
     }
 
-    protected override void Disconnect() {
-      base.Disconnect();
-      webSocket.Disconnect().Wait();
+    protected override async Task Disconnect() {
+      await base.Disconnect();
     }
 
     protected override async Task<ITradeUpdate?> MarketLoopCycle() {
