@@ -10,24 +10,26 @@ using PiTrade.Logging;
 using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
-  public class Order : IDisposable {
+  public abstract class Order : IOrder {
+    private readonly IExchangeAPI api;
     private readonly IList<Func<Order, Task>> whenFilledActions = new List<Func<Order, Task>>();
     private readonly IList<Func<Order, Task>> whenFaultedActions = new List<Func<Order, Task>>();
 
     public long? Id { get; private set; }
-    public Market Market { get; }
+    public IMarket Market { get; }
     public OrderSide Side { get; }
     public decimal TargetPrice { get; }
     public decimal Quantity { get; }
     public decimal Amount { get; private set; }
-    public decimal ExecutedAmount { get; private set; }
-    public decimal ExecutedQuantity { get; private set; }
-    public decimal AvgFillPrice { get; private set; }
-    public bool IsFilled { get; private set; }
-    public bool IsCancelled { get; private set; }
-    public bool IsFaulted { get; private set; }
+    public decimal ExecutedAmount { get; protected set; }
+    public decimal ExecutedQuantity { get; protected set; }
+    public decimal AvgFillPrice { get; protected set; }
+    public bool IsFilled { get; protected set; }
+    public bool IsCancelled { get; protected set; }
+    public bool IsFaulted { get; protected set; }
 
-    internal Order(long? orderId, Market market, OrderSide side, decimal targetPrice, decimal quantity) {
+    internal Order(IExchangeAPI api, long? orderId, IMarket market, OrderSide side, decimal targetPrice, decimal quantity) {
+      this.api = api;
       Id = orderId;
       Market = market;
       Side = side;
@@ -54,7 +56,6 @@ namespace PiTrade.Exchange {
       foreach(var fnc in whenFilledActions)
         await fnc(this);
       whenFilledActions.Clear();
-      Market.TradeUpdate -= OnTradeUpdate;
     }
 
     public async Task Cancel() {
@@ -93,7 +94,7 @@ namespace PiTrade.Exchange {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
         }
-        Log.Info($"Dispose Order {GetHashCode()}");
+        Log.Info($"Dispose Order [{GetHashCode()}][{ToString()}]");
         Cancel().Wait(5000);
         disposedValue = true;
       }

@@ -28,6 +28,7 @@ namespace PiTrade.Strategy {
         Price = price;
         BuyOrder = order;
       }
+      public override string ToString() => $"GRID Price = [{Price}] | BuyOrder = [{BuyOrder}] | SellOrder = [{SellOrder}]";
     }
 
     public event Action<GridTradingStrategy, decimal>? Profit;
@@ -60,6 +61,9 @@ namespace PiTrade.Strategy {
     // TODO: overseer strategy -> watches all markets -> good uptrends -> start grid trading
 
     public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal highPrice, decimal lowPrice, uint gridCount, decimal sellThreshold, bool autoDisable = true) /*: base(market)*/ {
+      if (lowPrice > highPrice)
+        throw new ArgumentException("LowPrice has to be greater than HighPrice.");
+
       this.market = market;
       this.quotePerGrid = quotePerGrid;
       this.highPrice = highPrice;
@@ -67,10 +71,10 @@ namespace PiTrade.Strategy {
       this.sellThreshold = sellThreshold;
       this.autoDisable = autoDisable;
 
-      this.grids = NumSpace.Linear(highPrice, lowPrice, gridCount)
+      this.grids = NumSpace.Linear(highPrice, lowPrice, (gridCount + 1), true)
                            .Select(x => new Grid(x)).ToArray();
-      foreach (var grid in grids)
-        Log.Info($"[{market.Asset}{market.Quote}] grid = {grid.Price}");
+
+      PrintGrids();
     }
 
     public void Enable() {
@@ -165,6 +169,8 @@ namespace PiTrade.Strategy {
           hit.BuyOrder = null;
           hit.SellOrder = null;
         }
+        Log.Info($"SOLD [{o}]");
+        PrintGrids();
         AddCommission(o);
         Profit?.Invoke(this, o.Amount - buyOrder.Amount);
       });
@@ -182,6 +188,10 @@ namespace PiTrade.Strategy {
     private decimal GetQuantity(decimal price) => quotePerGrid / price;
     private decimal GetSellPrice(decimal price) => price * (1m + sellThreshold);
 
+    private void PrintGrids() {
+      foreach (var grid in grids)
+        Log.Info($"[{market.Asset}{market.Quote}] {grid}");
+    }
     /*
     protected override async Task Update(decimal currentPrice) {
       if (State != null)

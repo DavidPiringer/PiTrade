@@ -113,11 +113,14 @@ namespace PiTrade.Exchange.Binance {
     }
 
 
-    internal async Task<ErrorState> Cancel(Order order) =>
-      await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
+    internal async Task<ErrorState> Cancel(Order order) {
+      if(!order.Id.HasValue) return ErrorState.None;
+
+      return await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
         { {"symbol", MarketString(order.Market) },
         {"orderId", order.Id.ToString()} }) == null ?
-      ErrorState.ConnectionLost : ErrorState.None;
+      ErrorState.IdNotFound : ErrorState.None;
+    }
 
 
     internal Task CancelAll(IMarket market) =>

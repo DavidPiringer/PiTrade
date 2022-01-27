@@ -13,16 +13,6 @@ namespace PiTrade.Exchange {
     private readonly IList<Func<IMarket, ITradeUpdate, Task>> tradeUpdateFncs = new List<Func<IMarket, ITradeUpdate, Task>>();
     private readonly IList<Func<IMarket, decimal, Task>> priceChangedFncs = new List<Func<IMarket, decimal, Task>>();
 
-    public event Func<IMarket, ITradeUpdate, Task> TradeUpdate {
-      add { Connect(); tradeUpdateFncs.Add(value); }
-      remove { tradeUpdateFncs.Remove(value); Disconnect(); }
-    }
-
-    public event Func<IMarket, decimal, Task> PriceChanged {
-      add { Connect(); priceChangedFncs.Add(value); }
-      remove { priceChangedFncs.Remove(value); Disconnect(); }
-    }
-
     public IExchange Exchange { get; }
     public Symbol Asset { get; }
     public Symbol Quote { get; }
@@ -60,15 +50,13 @@ namespace PiTrade.Exchange {
       return (new Order(orderId, this, side, price, qty), error);
     }
     public abstract Task<(long? orderId, ErrorState error)> NewLimitOrder(OrderSide side, decimal price, decimal quantity);
-
+    //protected internal abstract Task<ErrorState> QueryCurrentOpenOrders(Order order);
     protected internal abstract Task<ErrorState> CancelOrder(Order order);
     protected abstract Task<ITradeUpdate?> MarketLoopCycle();
 
-    //internal void RegisterOrder(Order order) => openOrders.Add(order);
-
-    //internal void UnregisterOrder(Order order) => openOrders.Remove(order);
 
     public void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc) {
+      Connect().Wait();
       tradeUpdateFncs.Add(fnc);
     }
 
@@ -78,6 +66,7 @@ namespace PiTrade.Exchange {
      
 
     public void Register2PriceChanges(Func<IMarket, decimal, Task> fnc) {
+      Connect().Wait();
       priceChangedFncs.Add(fnc);
     }
 

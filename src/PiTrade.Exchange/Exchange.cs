@@ -14,19 +14,11 @@ namespace PiTrade.Exchange {
 
     public event Action<IMarket>? MarketAdded;
 
-    public IMarket? GetMarket(Symbol asset, Symbol quote) {
-      var market = markets.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
-      market?.Connect().Wait();
-      return market;
-    }
+    public IMarket? GetMarket(Symbol asset, Symbol quote) =>
+      markets.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
 
     public async Task Run(CancellationToken cancellationToken) {
-      /*
       IList<Task> tasks = new List<Task>();
-      foreach (var market in markets)
-        tasks.Add(market.Connect());
-      Task.WaitAll(tasks.ToArray());
-      */
       while (!cancellationToken.IsCancellationRequested) {
         var enabledMarkets = markets.Where(x => x.IsEnabled).ToArray();
 
@@ -34,13 +26,12 @@ namespace PiTrade.Exchange {
         if (!enabledMarkets.Any()) return;
 
         // iterate markets
-        foreach (var market in enabledMarkets) {
-          Log.Info($"market = {market.Asset}{market.Quote}");
-          await market.Update();
-        }
+        foreach (var market in enabledMarkets)
+          tasks.Add(market.Update());
+        Task.WaitAll(tasks.ToArray());
+        tasks.Clear();
+
         await Update(cancellationToken);
-        //Task.WaitAll(tasks.ToArray());
-        //tasks.Clear();
       }
 
       foreach (var market in markets)

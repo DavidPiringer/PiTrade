@@ -16,6 +16,8 @@ namespace PiTrade.Exchange.Entities {
     public static Symbol ADA => new Symbol("ADA");
     public static Symbol LUNA => new Symbol("LUNA");
     public static Symbol PORTO => new Symbol("PORTO");
+    public static Symbol REN => new Symbol("REN");
+    public static Symbol FRONT => new Symbol("FRONT");
     public static Symbol FTM => new Symbol("FTM");
     public static Symbol ATOM => new Symbol("ATOM");
     public static Symbol DOT => new Symbol("DOT");
