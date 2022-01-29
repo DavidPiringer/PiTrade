@@ -5,6 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace PiTrade.Exchange {
-  public interface IExchangeAPI {
+  public interface IMarketStream {
+    Task Subscribe(IMarket market);
+    Task Unsubscribe(IMarket market);
+    Task<ITradeUpdate> NextUpdate();
   }
 }

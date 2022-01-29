@@ -15,8 +15,9 @@ namespace PiTrade.Exchange {
     Symbol Quote { get; }
     int AssetPrecision { get; }
     int QuotePrecision { get; }
-    Task<(Order, ErrorState error)> CreateMarketOrder(OrderSide side, decimal quantity);
-    Task<(Order, ErrorState error)> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+
+    Task<IOrder> CreateMarketOrder(OrderSide side, decimal quantity);
+    Task<IOrder> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
 
     void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
     void Unregister2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);

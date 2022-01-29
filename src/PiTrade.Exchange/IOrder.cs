@@ -8,7 +8,7 @@ using PiTrade.Exchange.Enums;
 namespace PiTrade.Exchange {
   public interface IOrder : IDisposable {
 
-    long? Id { get; }
+    long Id { get; }
     IMarket Market { get; }
     OrderSide Side { get; }
     decimal TargetPrice { get; }
@@ -19,9 +19,8 @@ namespace PiTrade.Exchange {
     decimal AvgFillPrice { get; }
     OrderState State { get; }
 
-
     Task Cancel();
-    Task WhenFilled(Action<Order> fnc);
-    Task WhenFilled(Func<Order, Task> fnc);
+    Task WhenFilled(Action<IOrder> fnc);
+    Task WhenFilled(Func<IOrder, Task> fnc);
   }
 }

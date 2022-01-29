@@ -4,10 +4,11 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using PiTrade.Logging;
 
 namespace PiTrade.Networking {
-  public class WebSocket {
+  public class WebSocket<T> where T : class {
     private static readonly int receiveBufferSize = 8192;
     private readonly Uri uri;
 
@@ -19,7 +20,7 @@ namespace PiTrade.Networking {
     }
 
 
-    public async Task<(string? message, bool success)> NextMessage() {
+    public async Task<(T? message, bool success)> NextMessage() {
       try {
         if (Socket == null || CTS == null || Socket.State != WebSocketState.Open)
           await Connect();
@@ -34,10 +35,10 @@ namespace PiTrade.Networking {
         } while (!receiveResult.EndOfMessage);
         outputStream.Position = 0;
         using StreamReader reader = new(outputStream);
-        return (reader.ReadToEnd(), true);
+        return (JsonConvert.DeserializeObject<T>(reader.ReadToEnd()), true);
       } catch (Exception ex) {
         Log.Error($"{ex.GetType().Name} - {ex.Message}");
-        return (null, false);
+        return (default(T), false);
       }
     }
 
@@ -66,7 +67,6 @@ namespace PiTrade.Networking {
       if(Socket != null) {
         if (Socket.State == WebSocketState.Open && CTS != null) {
           CTS.CancelAfter(TimeSpan.FromSeconds(2));
-          //await Socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
           await Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
         }
         Socket.Dispose();

@@ -7,10 +7,10 @@ using PiTrade.Exchange.Entities;
 
 namespace PiTrade.Exchange {
   public interface IExchange {
-    event Action<IMarket>? MarketAdded;
-    IEnumerable<IMarket> AvailableMarkets { get; }
-    IMarket? GetMarket(Symbol asset, Symbol quote);
+    Task<IMarket[]> GetMarkets();
+    Task<IMarket?> GetMarket(Symbol asset, Symbol quote);
 
-    public Task Run(CancellationToken cancellationToken);
+    Task Subscribe(params IMarket[] markets);
+    void Run(CancellationToken cancellationToken);
   }
 }

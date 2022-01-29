@@ -4,48 +4,63 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PiTrade.Exchange.DTOs;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
 using PiTrade.Logging;
 using PiTrade.Networking;
 
-namespace PiTrade.Exchange {
-  public abstract class Order : IOrder {
-    private readonly IExchangeAPI api;
+namespace PiTrade.Exchange.Base {
+  public class Order : IOrder {
+    private readonly IExchangeAPIClient api;
     private readonly IList<Func<Order, Task>> whenFilledActions = new List<Func<Order, Task>>();
     private readonly IList<Func<Order, Task>> whenFaultedActions = new List<Func<Order, Task>>();
 
-    public long? Id { get; private set; }
-    public IMarket Market { get; }
-    public OrderSide Side { get; }
-    public decimal TargetPrice { get; }
-    public decimal Quantity { get; }
+    public long Id { get; private set; }
+    public IMarket Market { get; private set; }
+    public OrderSide Side { get; private set; }
+    public decimal TargetPrice { get; private set; }
+    public decimal Quantity { get; private set; }
     public decimal Amount { get; private set; }
-    public decimal ExecutedAmount { get; protected set; }
-    public decimal ExecutedQuantity { get; protected set; }
-    public decimal AvgFillPrice { get; protected set; }
-    public bool IsFilled { get; protected set; }
-    public bool IsCancelled { get; protected set; }
-    public bool IsFaulted { get; protected set; }
+    public decimal ExecutedAmount { get; private set; }
+    public decimal ExecutedQuantity { get; private set; }
+    public decimal AvgFillPrice { get; private set; }
+    public OrderState State { get; private set; }
 
-    internal Order(IExchangeAPI api, long? orderId, IMarket market, OrderSide side, decimal targetPrice, decimal quantity) {
+    private Order(IExchangeAPIClient api, IMarket market) {
       this.api = api;
-      Id = orderId;
       Market = market;
-      Side = side;
-      TargetPrice = targetPrice;
-      Quantity = quantity;
-      market.Register2TradeUpdates(OnTradeUpdate);
+    }
+
+    internal static async Task<Order> Create(IExchangeAPIClient api, IMarket market, Func<Task<OrderDTO?>> creationFnc) {
+      var order = new Order(api, market);
+      market.Register2TradeUpdates(order.OnTradeUpdate);
+      var dto = await creationFnc();
+      order.Init(market, dto.Value);
+      return order;
+    }
+
+    private void Init(IMarket market, OrderDTO? dto) {
+      Market = market;
+      if(dto.HasValue) {
+        Id = dto.Value.Id;
+        Side = dto.Value.Side;
+        TargetPrice = dto.Value.TargetPrice;
+        Quantity = dto.Value.Quantity;
+        State = OrderState.Open;
+      } else {
+        State = OrderState.Faulted;
+      }
     }
 
     internal async Task OnTradeUpdate(IMarket market, ITradeUpdate update) {
-      if (Id.HasValue && update.Match(Id.Value)) {
+      if (State == OrderState.Open && update.Match(Id)) {
         ExecutedQuantity += update.Quantity;
         AvgFillPrice += update.Price * (update.Quantity / Quantity);
         ExecutedAmount = AvgFillPrice * ExecutedQuantity;
         Amount = AvgFillPrice * ExecutedQuantity;
-        IsFilled = Quantity <= ExecutedQuantity;
-        if (IsFilled) {
+        if (Quantity <= ExecutedQuantity) {
+          State = OrderState.Filled;
           await ExecuteWhenFilledActions();
           market.Unregister2TradeUpdates(OnTradeUpdate);
         }
@@ -59,21 +74,21 @@ namespace PiTrade.Exchange {
     }
 
     public async Task Cancel() {
-      if (!IsFilled && !IsCancelled) {
-        IsCancelled = true;
+      if (State != OrderState.Filled && State != OrderState.Cancelled) {
+        State = OrderState.Cancelled;
         Market.Unregister2TradeUpdates(OnTradeUpdate);
-        await ExponentialBackoff.Try(async () => ErrorState.ConnectionLost == await Market.CancelOrder(this));
+        await ExponentialBackoff.Try(async () => await api.CancelOrder(Id));
       }
     }
 
-    public async Task WhenFilled(Action<Order> fnc) => 
+    public async Task WhenFilled(Action<IOrder> fnc) => 
       await WhenFilled(async o => {
         fnc(o);
         await Task.CompletedTask;
       });
 
-    public async Task WhenFilled(Func<Order, Task> fnc) {
-      if (IsFilled) await fnc(this);
+    public async Task WhenFilled(Func<IOrder, Task> fnc) {
+      if (State == OrderState.Filled) await fnc(this);
       else whenFilledActions.Add(fnc);
     }
 

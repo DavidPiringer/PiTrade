@@ -27,6 +27,7 @@ if (key == null || secret == null)
  *   - BasicExchange -> T : IExchangeAPI
  *   - Exchange -> T: IExchangeAPI, IExchangeStream / Listener
  * - Remove Connect/Disconnect from Market ???
+ * 
  */
 var exchange = new BinanceExchange(key, secret);
 var market = exchange.GetMarket(Symbol.ETH, Symbol.USDT);
