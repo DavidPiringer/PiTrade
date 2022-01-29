@@ -11,7 +11,7 @@ using PiTrade.Logging;
 using PiTrade.Networking;
 
 namespace PiTrade.Exchange.Base {
-  public class Order : IOrder {
+  public sealed class Order : IOrder {
     private readonly IExchangeAPIClient api;
     private readonly IList<Func<Order, Task>> whenFilledActions = new List<Func<Order, Task>>();
     private readonly IList<Func<Order, Task>> whenFaultedActions = new List<Func<Order, Task>>();
@@ -104,7 +104,7 @@ namespace PiTrade.Exchange.Base {
 
     #region Disposable Support
     private bool disposedValue = false;
-    protected virtual void Dispose(bool disposing) {
+    private void Dispose(bool disposing) {
       if (!disposedValue) {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
