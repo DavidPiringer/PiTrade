@@ -9,15 +9,13 @@ using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public interface IExchangeAPIClient {
-
+    decimal CommissionFee { get; }
     Task<MarketDTO[]> FetchMarkets();
     Task<OrderDTO?> CreateMarketOrder(IMarket market, OrderSide side, decimal quantity);
     Task<OrderDTO?> CreateLimitOrder(IMarket market, OrderSide side, decimal price, decimal quantity);
     Task<OrderDTO?> GetOrder(IMarket market, long orderId);
     Task<bool> CancelOrder(IOrder order);
     Task<bool> CancelOrder(IMarket market, long orderId);
-    //Task ManageCommission(decimal price, decimal quantity);
-    //Task<WebSocket<ITradeUpdate>> GetStream(params IMarket[] markets);
 
   }
 }

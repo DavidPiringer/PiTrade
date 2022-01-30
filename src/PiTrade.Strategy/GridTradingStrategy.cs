@@ -146,7 +146,7 @@ namespace PiTrade.Strategy {
           hit.BuyOrder = order;
       }
       await order.WhenFilled(async o => {
-        AddCommission(o);
+        await CommissionManager.ManageCommission(o);
         await Sell(market, o, hits);
       });
 
@@ -168,11 +168,11 @@ namespace PiTrade.Strategy {
       foreach (var hit in hits)
         hit.SellOrder = order;
 
-      await order.WhenFilled(o => {
+      await order.WhenFilled(async o => {
+        await CommissionManager.ManageCommission(o);
         ClearGrids(hits);
         Log.Info($"SOLD [{o}]");
         PrintGrids();
-        AddCommission(o);
         Profit?.Invoke(this, o.Amount - buyOrder.Amount);
       });
 
@@ -182,6 +182,7 @@ namespace PiTrade.Strategy {
     private void ClearGrids(IEnumerable<Grid> grids) {
       lock (locker) {
         foreach (var grid in grids) {
+          Log.Info($"Canceled Grid");
           grid.BuyOrder = null;
           grid.SellOrder = null;
           grid.IsFree = true;
@@ -189,9 +190,6 @@ namespace PiTrade.Strategy {
       }
     }
 
-    private void AddCommission(IOrder order) {
-      Commission?.Invoke(this, order.Amount * 0.0075m);
-    }
     private decimal GetQuantity(decimal price) => quotePerGrid / price;
     private decimal GetSellPrice(decimal price) => price * (1m + sellThreshold);
 

@@ -28,6 +28,9 @@ namespace PiTrade.Exchange.Binance {
       set { lock (locker) { ping = value; } }
     }
 
+    public decimal CommissionFee => 0.0075m;
+
+
     public BinanceStreamAPIClient(string key, string secret) {
       this.secret = secret;
       client = new HttpClient();
@@ -150,6 +153,7 @@ namespace PiTrade.Exchange.Binance {
 
       return new WebSocket<ITradeUpdate>(new Uri(uri), WebSocketTransformFnc);
     });
+
 
     #region Helper
     private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
