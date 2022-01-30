@@ -14,7 +14,6 @@ namespace PiTrade.Strategy {
 
     public MultiMarketTrader(IExchange exchange) {
       this.exchange = exchange;
-      exchange.MarketAdded += OnMarketAdded;
       CTS = new CancellationTokenSource();
     }
 
