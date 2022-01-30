@@ -15,15 +15,21 @@ namespace PiTrade.Exchange.Base {
     private readonly IExchangeStreamClient api;
     private readonly ConcurrentQueue<ITradeUpdate> tradeUpdates = new ConcurrentQueue<ITradeUpdate>();
     private readonly List<IMarket> subscribedMarkets = new List<IMarket>();
+    private readonly TimeSpan fetchMarketsUpdateInterval;
     private IMarket[]? markets;
 
-    public Exchange(IExchangeStreamClient api) { 
+    private DateTime lastFetchmarketsUpdate = DateTime.MinValue;
+
+    public Exchange(IExchangeStreamClient api) : this(api, TimeSpan.FromMinutes(5)) { }
+
+    public Exchange(IExchangeStreamClient api, TimeSpan fetchMarketsUpdateInterval) {
       this.api = api;
+      this.fetchMarketsUpdateInterval = fetchMarketsUpdateInterval;
     }
 
     public async Task<IMarket[]> GetMarkets() {
-      if(markets == null) // TODO: update interval?? cache is only valid for x period time
-        markets = (await api.FetchMarkets()).Select(x => new Market(this, api, x)).ToArray();
+      if (markets == null)
+        markets = await FetchMarkets();
       return markets;
     }
 
@@ -48,7 +54,10 @@ namespace PiTrade.Exchange.Base {
     private IMarket? SearchMarket(IEnumerable<IMarket> m, Symbol asset, Symbol quote) =>
       m.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
 
-    public void Run(CancellationToken cancellationToken) {
+    private async Task<IMarket[]> FetchMarkets() =>
+      (await api.FetchMarkets()).Select(x => new Market(this, api, x)).ToArray();
+
+    public async void Run(CancellationToken cancellationToken) {
       IList<Task> tasks = new List<Task>();
       while (!cancellationToken.IsCancellationRequested) {
         // iterate markets
@@ -57,6 +66,12 @@ namespace PiTrade.Exchange.Base {
             var market = SearchMarket(subscribedMarkets.ToArray(), update.Asset, update.Quote);
             if(market != null && market is Market m) tasks.Add(m.Update(update));
           }
+        }
+
+        // update markets
+        if (lastFetchmarketsUpdate.Add(fetchMarketsUpdateInterval) < DateTime.Now) {
+          lastFetchmarketsUpdate = DateTime.Now;
+          markets = await FetchMarkets();
         }
         Task.WaitAll(tasks.ToArray());
         tasks.Clear();

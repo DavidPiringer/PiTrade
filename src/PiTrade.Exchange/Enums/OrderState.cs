@@ -6,6 +6,6 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange.Enums {
   public enum OrderState {
-    Open, Filled, Cancelled, Faulted
+    Open, Filled, Canceled, Faulted
   }
 }

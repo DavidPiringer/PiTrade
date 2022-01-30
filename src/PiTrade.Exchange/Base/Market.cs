@@ -35,18 +35,45 @@ namespace PiTrade.Exchange.Base {
     public async Task<IOrder> CreateMarketOrder(OrderSide side, decimal quantity) {
       var qty = quantity.RoundDown(AssetPrecision);
       var price = CurrentPrice;
-      return await Order.Create(api, this, async () => await api.CreateMarketOrder(this, side, qty));
+      return await Order.Create(api, this, async () => {
+        var dto = await api.CreateMarketOrder(this, side, qty);
+        if (dto.HasValue) {
+          var o = dto.Value;
+          o.ExecutedAmount = 0;
+          o.ExecutedQuantity = 0;
+          o.AvgFillPrice = 0;
+          o.Quantity = qty;
+          o.TargetPrice = price;
+          o.Side = side;
+          return o;
+        }
+        return null;
+      });
     }
 
     public async Task<IOrder> CreateLimitOrder(OrderSide side, decimal price, decimal quantity) {
       var p = price.RoundDown(QuotePrecision);
       var qty = quantity.RoundDown(AssetPrecision);
-      return await Order.Create(api, this, async () => await api.CreateLimitOrder(this, side, p, qty));
+      return await Order.Create(api, this, async () => {
+        var dto = await api.CreateLimitOrder(this, side, p, qty);
+        if (dto.HasValue) {
+          var o = dto.Value;
+          o.Market = this;
+          o.ExecutedAmount = 0;
+          o.ExecutedQuantity = 0;
+          o.AvgFillPrice = 0;
+          o.Quantity = qty;
+          o.TargetPrice = p;
+          o.Side = side;
+          return o;
+        }
+        return null;
+      });
     }
 
     public void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc) => tradeUpdateFncs.Add(fnc);
     public void Unregister2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc) => tradeUpdateFncs.Remove(fnc);
-     
+
 
     public void Register2PriceChanges(Func<IMarket, decimal, Task> fnc) => priceChangedFncs.Add(fnc);
     public void Unregister2PriceChanges(Func<IMarket, decimal, Task> fnc) => priceChangedFncs.Remove(fnc);

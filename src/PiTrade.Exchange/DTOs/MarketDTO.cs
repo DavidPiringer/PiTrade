@@ -7,9 +7,9 @@ using PiTrade.Exchange.Entities;
 
 namespace PiTrade.Exchange.DTOs {
   public struct MarketDTO {
-    public Symbol Asset { get; }
-    public Symbol Quote { get; }
-    public int AssetPrecision { get; }
-    public int QuotePrecision { get; }
+    public Symbol Asset { get; set; }
+    public Symbol Quote { get; set; }
+    public int AssetPrecision { get; set; }
+    public int QuotePrecision { get; set; }
   }
 }
