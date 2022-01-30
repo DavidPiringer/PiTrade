@@ -11,12 +11,15 @@ namespace PiTrade.Networking {
   public class WebSocket<T> where T : class {
     private static readonly int receiveBufferSize = 8192;
     private readonly Uri uri;
+    private readonly Func<string, T?> transformFnc;
 
     private ClientWebSocket? Socket { get; set; }
     private CancellationTokenSource? CTS { get; set; }
 
-    public WebSocket(Uri connectionUri) { 
+    public WebSocket(Uri uri) : this(uri, s => JsonConvert.DeserializeObject<T>(s)) { }
+    public WebSocket(Uri connectionUri, Func<string, T?> transformFnc) { 
       uri = connectionUri;
+      this.transformFnc = transformFnc;
     }
 
 
@@ -35,7 +38,7 @@ namespace PiTrade.Networking {
         } while (!receiveResult.EndOfMessage);
         outputStream.Position = 0;
         using StreamReader reader = new(outputStream);
-        return (JsonConvert.DeserializeObject<T>(reader.ReadToEnd()), true);
+        return (transformFnc(reader.ReadToEnd()), true);
       } catch (Exception ex) {
         Log.Error($"{ex.GetType().Name} - {ex.Message}");
         return (default(T), false);
