@@ -128,7 +128,6 @@ namespace PiTrade.Strategy {
       }
 
       if (hits.Length > 0) await Buy(market, price, hits);
-      
     }
 
     private async Task Buy(IMarket market, decimal price, IEnumerable<Grid> hits) {
@@ -150,11 +149,8 @@ namespace PiTrade.Strategy {
         AddCommission(o);
         await Sell(market, o, hits);
       });
-      /*
-      order.WhenFaulted(o => {
-        foreach (var hit in hits)
-          hit.BuyOrder = null;
-      });*/
+
+      await order.WhenCanceled(o => ClearGrids(hits));
     }
 
     private async Task Sell(IMarket market, IOrder buyOrder, IEnumerable<Grid> hits) {
@@ -173,24 +169,24 @@ namespace PiTrade.Strategy {
         hit.SellOrder = order;
 
       await order.WhenFilled(o => {
-        lock(locker) {
-          foreach (var hit in hits) {
-            hit.BuyOrder = null;
-            hit.SellOrder = null;
-            hit.IsFree = false;
-          }
-        }
+        ClearGrids(hits);
         Log.Info($"SOLD [{o}]");
         PrintGrids();
         AddCommission(o);
         Profit?.Invoke(this, o.Amount - buyOrder.Amount);
       });
-      /*
-      order.WhenFaulted(o => {
-        foreach (var hit in hits)
-          hit.SellOrder = null;
-      });*/
 
+      await order.WhenCanceled(o => ClearGrids(hits));
+    }
+
+    private void ClearGrids(IEnumerable<Grid> grids) {
+      lock (locker) {
+        foreach (var grid in grids) {
+          grid.BuyOrder = null;
+          grid.SellOrder = null;
+          grid.IsFree = true;
+        }
+      }
     }
 
     private void AddCommission(IOrder order) {
