@@ -28,9 +28,6 @@ namespace PiTrade.Exchange.Binance {
       set { lock (locker) { ping = value; } }
     }
 
-    private DateTime lastUpdate = DateTime.MinValue;
-
-
     public BinanceStreamAPIClient(string key, string secret) {
       this.secret = secret;
       client = new HttpClient();
