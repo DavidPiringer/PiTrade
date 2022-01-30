@@ -22,5 +22,7 @@ namespace PiTrade.Exchange {
     Task Cancel();
     Task WhenFilled(Action<IOrder> fnc);
     Task WhenFilled(Func<IOrder, Task> fnc);
+    Task WhenCanceled(Action<IOrder> fnc);
+    Task WhenCanceled(Func<IOrder, Task> fnc);
   }
 }

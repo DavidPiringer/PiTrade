@@ -14,7 +14,9 @@ namespace PiTrade.Exchange.Base {
   public sealed class Order : IOrder {
     private readonly IExchangeAPIClient api;
     private readonly IList<Func<Order, Task>> whenFilledActions = new List<Func<Order, Task>>();
+    private readonly IList<Func<Order, Task>> whenCanceledActions = new List<Func<Order, Task>>();
     private readonly IList<Func<Order, Task>> whenFaultedActions = new List<Func<Order, Task>>();
+    private readonly TimeSpan updateInterval = TimeSpan.FromMinutes(2.0);
 
     public long Id { get; private set; }
     public IMarket Market { get; private set; }
@@ -26,6 +28,8 @@ namespace PiTrade.Exchange.Base {
     public decimal ExecutedQuantity { get; private set; }
     public decimal AvgFillPrice { get; private set; }
     public OrderState State { get; private set; }
+
+    private DateTime lastUpdate = DateTime.Now;
 
     private Order(IExchangeAPIClient api, IMarket market) {
       this.api = api;
@@ -54,6 +58,10 @@ namespace PiTrade.Exchange.Base {
     }
 
     internal async Task OnTradeUpdate(IMarket market, ITradeUpdate update) {
+      if (lastUpdate.Add(updateInterval) < DateTime.Now) { 
+        lastUpdate = DateTime.Now;
+        await UpdateSelf();
+      }
       if (State == OrderState.Open && update.Match(Id)) {
         ExecutedQuantity += update.Quantity;
         AvgFillPrice += update.Price * (update.Quantity / Quantity);
@@ -61,22 +69,36 @@ namespace PiTrade.Exchange.Base {
         Amount = AvgFillPrice * ExecutedQuantity;
         if (Quantity <= ExecutedQuantity) {
           State = OrderState.Filled;
-          await ExecuteWhenFilledActions();
-          market.Unregister2TradeUpdates(OnTradeUpdate);
+          await ExecuteWhenActions(whenFilledActions);
         }
       }
     }
 
-    private async Task ExecuteWhenFilledActions() {
-      foreach(var fnc in whenFilledActions)
+    private async Task UpdateSelf() {
+      var dto = await api.GetOrder(Market, Id);
+      if (dto.HasValue) {
+        ExecutedAmount = dto.Value.ExecutedAmount;
+        ExecutedQuantity = dto.Value.ExecutedQuantity;
+        AvgFillPrice = dto.Value.AvgFillPrice;
+        State = dto.Value.State;
+        if (State == OrderState.Filled)
+          await ExecuteWhenActions(whenFilledActions);
+        else if(State == OrderState.Canceled)
+          await ExecuteWhenActions(whenCanceledActions);
+      }
+    }
+
+    private async Task ExecuteWhenActions(IList<Func<Order, Task>> list) {
+      Market.Unregister2TradeUpdates(OnTradeUpdate);
+      foreach (var fnc in list)
         await fnc(this);
-      whenFilledActions.Clear();
+      list.Clear();
     }
 
     public async Task Cancel() {
       if (State != OrderState.Filled && State != OrderState.Canceled) {
         State = OrderState.Canceled;
-        Market.Unregister2TradeUpdates(OnTradeUpdate);
+        await ExecuteWhenActions(whenCanceledActions);
         await ExponentialBackoff.Try(async () => await api.CancelOrder(Market, Id));
       }
     }
@@ -90,6 +112,17 @@ namespace PiTrade.Exchange.Base {
     public async Task WhenFilled(Func<IOrder, Task> fnc) {
       if (State == OrderState.Filled) await fnc(this);
       else whenFilledActions.Add(fnc);
+    }
+
+    public async Task WhenCanceled(Action<IOrder> fnc) =>
+      await WhenCanceled(async o => {
+        fnc(o);
+        await Task.CompletedTask;
+      });
+
+    public async Task WhenCanceled(Func<IOrder, Task> fnc) {
+      if (State == OrderState.Canceled) await fnc(this);
+      else whenCanceledActions.Add(fnc);
     }
 
     public override string ToString() =>
