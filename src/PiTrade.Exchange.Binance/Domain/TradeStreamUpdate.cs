@@ -4,6 +4,9 @@ using PiTrade.Exchange.Entities;
 namespace PiTrade.Exchange.Binance.Domain {
   [JsonObject(MemberSerialization.OptIn)]
   internal class TradeStreamUpdate : ITradeUpdate {
+    [JsonProperty(PropertyName = "s")]
+    public string? Symbol { get; set; }
+
     [JsonProperty(PropertyName = "p")]
     public decimal Price { get; set; }
 
@@ -15,6 +18,12 @@ namespace PiTrade.Exchange.Binance.Domain {
 
     [JsonProperty(PropertyName = "a")]
     public long OIDSeller { get; set; }
+
+    [JsonIgnore]
+    public Symbol Asset { get; set; } = new Symbol("None");
+
+    [JsonIgnore]
+    public Symbol Quote { get; set; } = new Symbol("None");
 
     public bool Match(long id) => id == OIDSeller || id == OIDBuyer;
   }

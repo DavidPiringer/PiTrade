@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace PiTrade.Exchange.Binance {
+  /*
   internal class BinanceMarket : Market {
     private readonly WebSocket webSocket;
 
@@ -39,5 +40,5 @@ namespace PiTrade.Exchange.Binance {
       return null;
     }
 
-  }
+  }*/
 }

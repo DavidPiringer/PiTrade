@@ -12,6 +12,7 @@ using System.Text;
 using System.Web;
 
 namespace PiTrade.Exchange.Binance {
+  /*
   public sealed class BinanceExchange : Exchange {
     private const string BaseUri = "https://api.binance.com";
     private readonly TimeSpan UpdateInterval = TimeSpan.FromMinutes(5);
@@ -208,4 +209,5 @@ namespace PiTrade.Exchange.Binance {
     }
     #endregion
   }
+  */
 }
