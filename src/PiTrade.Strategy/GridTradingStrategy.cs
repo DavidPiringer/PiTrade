@@ -23,6 +23,7 @@ namespace PiTrade.Strategy {
       public decimal Price { get; set; }
       public IOrder? BuyOrder { get; set; }
       public IOrder? SellOrder { get; set; }
+      public bool IsFree { get; set; } = true;
       private Grid() { }
       public Grid(decimal price) : this(price, null) { }
       public Grid(decimal price, IOrder? order) {
@@ -52,6 +53,7 @@ namespace PiTrade.Strategy {
     private readonly decimal sellThreshold;
     private readonly bool autoDisable;
     private readonly Grid[] grids;
+    private readonly object locker = new object();
 
     private decimal LastPrice { get; set; } = decimal.MinValue;
 
@@ -113,14 +115,19 @@ namespace PiTrade.Strategy {
       if (autoDisable && (price > highPrice || lowPrice > price))
         await Disable();
 
-      var hits = grids.Where(x => 
-        LastPrice > x.Price && 
-        x.Price >= price && 
-        x.BuyOrder == null && 
-        x.SellOrder == null).ToArray();
+      Grid[] hits = new Grid[0];
+      lock(locker) {
+        hits = grids.Where(x => 
+          LastPrice > x.Price && 
+          x.Price >= price && 
+          x.IsFree).ToArray();
 
-      LastPrice = price;
-      if (hits.Any()) await Buy(market, price, hits);
+        LastPrice = price;
+        foreach (var hit in hits)
+          hit.IsFree = false;
+      }
+
+      if (hits.Length > 0) await Buy(market, price, hits);
       
     }
 
@@ -135,9 +142,9 @@ namespace PiTrade.Strategy {
         quantity *= 1.001m;
 
       IOrder order = await market.CreateLimitOrder(OrderSide.BUY, price, quantity);
-      foreach(var hit in hits) {
-        hit.BuyOrder = order;
-
+      lock (locker) {
+        foreach (var hit in hits)
+          hit.BuyOrder = order;
       }
       await order.WhenFilled(async o => {
         AddCommission(o);
@@ -166,9 +173,12 @@ namespace PiTrade.Strategy {
         hit.SellOrder = order;
 
       await order.WhenFilled(o => {
-        foreach (var hit in hits) {
-          hit.BuyOrder = null;
-          hit.SellOrder = null;
+        lock(locker) {
+          foreach (var hit in hits) {
+            hit.BuyOrder = null;
+            hit.SellOrder = null;
+            hit.IsFree = false;
+          }
         }
         Log.Info($"SOLD [{o}]");
         PrintGrids();
