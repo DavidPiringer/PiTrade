@@ -57,7 +57,7 @@ namespace PiTrade.Exchange.Base {
     private async Task<IMarket[]> FetchMarkets() =>
       (await api.FetchMarkets()).Select(x => new Market(this, api, x)).ToArray();
 
-    public async void Run(CancellationToken cancellationToken) {
+    public async Task Run(CancellationToken cancellationToken) {
       IList<Task> tasks = new List<Task>();
       while (!cancellationToken.IsCancellationRequested) {
         // iterate markets

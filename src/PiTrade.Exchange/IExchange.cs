@@ -11,6 +11,6 @@ namespace PiTrade.Exchange {
     Task<IMarket?> GetMarket(Symbol asset, Symbol quote);
 
     Task Subscribe(params IMarket[] markets);
-    void Run(CancellationToken cancellationToken);
+    Task Run(CancellationToken cancellationToken);
   }
 }
