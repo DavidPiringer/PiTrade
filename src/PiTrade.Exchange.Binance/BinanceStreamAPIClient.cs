@@ -144,12 +144,9 @@ namespace PiTrade.Exchange.Binance {
     }
 
     public async Task<WebSocket<ITradeUpdate>> GetStream(params IMarket[] markets) => await Task.Run(() => {
-      string uri = WSBaseUri;
-      if (markets.Length == 1) {
-        uri += $"/ws/{MarketString(markets.First()).ToLower()}@trade";
-      } else if (markets.Length > 1) {
-        uri += $"/stream?streams={string.Join("/", markets.Select(x => MarketString(x).ToLower()))}";
-      } else throw new ArgumentException("Cannot start a stream with an empty market array");
+      if (markets.Length == 0)
+        throw new ArgumentException("Cannot start a stream with an empty market array");
+      string uri = $"{WSBaseUri}/stream?streams={string.Join("/", markets.Select(x => $"{MarketString(x).ToLower()}@trade"))}";
 
       return new WebSocket<ITradeUpdate>(new Uri(uri), WebSocketTransformFnc);
     });
@@ -159,12 +156,12 @@ namespace PiTrade.Exchange.Binance {
     private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
 
     private ITradeUpdate? WebSocketTransformFnc(string msg) {
-      var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
-      if(update != null && update.Symbol != null && 
-        symbolMap.TryGetValue(update.Symbol.ToUpper(), out (Symbol Asset, Symbol Quote) tpl)) {
-        update.Asset = tpl.Asset;
-        update.Quote = tpl.Quote;
-        return update;
+      var data = JsonConvert.DeserializeObject<StreamData>(msg);
+      if(data != null && data.Update != null && data.Update.Symbol != null && 
+        symbolMap.TryGetValue(data.Update.Symbol.ToUpper(), out (Symbol Asset, Symbol Quote) tpl)) {
+        data.Update.Asset = tpl.Asset;
+        data.Update.Quote = tpl.Quote;
+        return data.Update;
       }
       return null;
     }

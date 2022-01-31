@@ -34,7 +34,6 @@ namespace PiTrade.Strategy {
     }
 
     public event Action<GridTradingStrategy, decimal>? Profit;
-    public event Action<GridTradingStrategy, decimal>? Commission;
     public event Action<GridTradingStrategy, bool>? EnableChanged;
 
     private bool isEnabled;
