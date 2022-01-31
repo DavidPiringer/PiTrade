@@ -11,10 +11,10 @@ namespace PiTrade.Strategy.Util {
       var e = Math.Min(start, end);
       var stepSize = (s - e) / count;
       if(cutFirst)
-        s += stepSize;
+        s -= stepSize;
 
-      for (decimal i = s; i > e; i -= stepSize)
-        yield return i;
+      for (int i = 0; i < count; ++i)
+        yield return s - i * stepSize;
     }
   }
 }

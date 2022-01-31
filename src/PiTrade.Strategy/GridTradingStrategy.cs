@@ -64,7 +64,12 @@ namespace PiTrade.Strategy {
 
     public GridTradingStrategy(IMarket market, decimal quotePerGrid, decimal highPrice, decimal lowPrice, uint gridCount, decimal sellThreshold, bool autoDisable = true) /*: base(market)*/ {
       if (lowPrice > highPrice)
-        throw new ArgumentException("LowPrice has to be greater than HighPrice.");
+        throw new ArgumentException("LowPrice has to be lower than HighPrice.");
+
+      var gridMaxPrice = highPrice / (1m + sellThreshold);
+      var gridMinprice = lowPrice;
+      if (gridMinprice > gridMaxPrice)
+        throw new ArgumentException("Cannot initialize grids: the gap between high and low price is to narrow.");
 
       this.market = market;
       this.quotePerGrid = quotePerGrid;
@@ -72,8 +77,7 @@ namespace PiTrade.Strategy {
       this.lowPrice = lowPrice;
       this.sellThreshold = sellThreshold;
       this.autoDisable = autoDisable;
-
-      this.grids = NumSpace.Linear(highPrice, lowPrice, (gridCount + 1), true)
+      this.grids = NumSpace.Linear(gridMaxPrice, gridMinprice, gridCount)
                            .Select(x => new Grid(x)).ToArray();
 
       PrintGrids();
@@ -181,7 +185,6 @@ namespace PiTrade.Strategy {
     private void ClearGrids(IEnumerable<Grid> grids) {
       lock (locker) {
         foreach (var grid in grids) {
-          Log.Info($"Canceled Grid");
           grid.BuyOrder = null;
           grid.SellOrder = null;
           grid.IsFree = true;

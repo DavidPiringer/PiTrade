@@ -27,10 +27,7 @@ if (market != null && commissionMarket != null) {
   CommissionManager.CommissionMarket = commissionMarket;
   CommissionManager.CommissionFee = client.CommissionFee;
   CommissionManager.BuyThreshold = 15m;
-
-  var strategy = new GridTradingStrategy(market, 10.0m, 2650m, 2550m, 20, 0.005m); // TODO: better grid calc between bounds (nicht die ränder verwenden) -> x% * (max-min)
-  // TODO: gegenchecken der orders (!isFilled || !isCancelled) in zeitabständen (zwecks der sicherheit)
-  //var strategy = new GridTradingStrategy(market, 20.0m, 0.7m, 0.67m, 10, 0.005m);
+  var strategy = new GridTradingStrategy(market, 10.0m, 2900m, 2300m, 100, 0.004m, false); 
   strategy.Enable();
 }
 
