@@ -27,7 +27,7 @@ if (market != null && commissionMarket != null) {
   CommissionManager.CommissionMarket = commissionMarket;
   CommissionManager.CommissionFee = client.CommissionFee;
   CommissionManager.BuyThreshold = 15m;
-  var strategy = new GridTradingStrategy(market, 10.0m, 3100m, 0.5m, 2500m, 100, 0.005m, false); 
+  var strategy = new GridTradingStrategy(market, 10.0m, 0.5m, 3100m, 2500m, 100, 0.005m, false); 
   strategy.Enable();
 }
 
