@@ -30,7 +30,7 @@ if (market != null && commissionMarket != null) {
   CommissionManager.CommissionFee = client.CommissionFee;
   CommissionManager.BuyThreshold = 15m;
 
-  GridTradingStrategyConfig? strategyConfig = JsonConvert.DeserializeObject<GridTradingStrategyConfig>(args.Last());
+  GridTradingStrategyConfig? strategyConfig = JsonConvert.DeserializeObject<GridTradingStrategyConfig>(File.ReadAllText(args.Last()));
   if(strategyConfig != null) {
     var strategy = new GridTradingStrategy(market, strategyConfig);
     strategy.Enable();
