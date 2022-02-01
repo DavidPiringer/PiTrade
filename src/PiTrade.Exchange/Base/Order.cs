@@ -126,13 +126,11 @@ namespace PiTrade.Exchange.Base {
     }
 
     public override string ToString() =>
-      $"Id = {Id}, " +
+      //$"Id = {Id}, " +
       $"Market = {Market}, " +
       $"Side = {Side}, " +
-      $"Price = {TargetPrice}, " +
-      $"Quantity = {Quantity}, " +
-      $"ExecutedQuantity = {ExecutedQuantity}, " +
-      $"Amount = {TargetPrice * Quantity}";
+      $"Price = {TargetPrice}({AvgFillPrice}), " +
+      $"Quantity = {ExecutedQuantity}/{Quantity}";
 
 
     #region Disposable Support
