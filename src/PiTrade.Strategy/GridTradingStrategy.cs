@@ -75,14 +75,16 @@ namespace PiTrade.Strategy {
       bool autoDisable = true) {
       if (lowPrice > highPrice)
         throw new ArgumentException("LowPrice has to be lower than HighPrice.");
+      if (reinvestProfitRatio < 0 || reinvestProfitRatio > 1.0m)
+        throw new ArgumentException("Reinvest Profit Ratio needs to be between 0.0 and 1.0.");
+      if (gridCount == 0)
+        throw new ArgumentException("Grid Count needs to be higher than 0.");
 
       var gridMaxPrice = highPrice / (1m + sellThreshold);
       var gridMinprice = lowPrice;
       if (gridMinprice > gridMaxPrice)
         throw new ArgumentException("Cannot initialize grids: the gap between high and low price is to narrow.");
 
-      if (reinvestProfitRatio < 0 || reinvestProfitRatio > 1.0m)
-        throw new ArgumentException("ReinvestProfitRatio needs to be between 0.0 and 1.0.");
 
       this.market = market;
       this.minQuotePerGrid = minQuotePerGrid;

@@ -30,14 +30,10 @@ if (market != null && commissionMarket != null) {
   CommissionManager.CommissionFee = client.CommissionFee;
   CommissionManager.BuyThreshold = 15m;
 
-  File.WriteAllText("strategyConfig.json", JsonConvert.SerializeObject(new GridTradingStrategyConfig()));
   GridTradingStrategyConfig? strategyConfig = JsonConvert.DeserializeObject<GridTradingStrategyConfig>(File.ReadAllText(args.Last()));
   if(strategyConfig != null) {
     var strategy = new GridTradingStrategy(market, strategyConfig);
     strategy.Enable();
-  } else {
-    Log.Error("No related config for strategy found. Created a empty template named 'strategyConfig.json'"); 
-    File.WriteAllText("strategyConfig.json", JsonConvert.SerializeObject(new GridTradingStrategyConfig()));
   }
   //var strategy = new GridTradingStrategy(market, 10.0m, 0.5m, 3050m, 2700m, 100, 0.005m, false); 
   
