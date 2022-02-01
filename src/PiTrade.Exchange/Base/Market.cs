@@ -24,7 +24,7 @@ namespace PiTrade.Exchange.Base {
 
     internal Market(Exchange exchange, IExchangeStreamClient api, MarketDTO dto) {
       this.api = api;
-      name = $"{exchange}-{dto.Asset}{dto.Quote}";
+      name = $"{api.Name}-{dto.Asset}{dto.Quote}";
       Exchange = exchange;
       Asset = dto.Asset;
       Quote = dto.Quote;

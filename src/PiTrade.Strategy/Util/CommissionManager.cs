@@ -15,11 +15,13 @@ namespace PiTrade.Strategy.Util {
 
     private static decimal Commission { get; set; }
 
-    public static async Task ManageCommission(IOrder order) {
+    public static async Task<decimal?> ManageCommission(IOrder order) {
       decimal? quantity = null;
+      decimal? commission = null;
       lock (locker) {
         if (CommissionMarket != null && CommissionFee.HasValue && BuyThreshold.HasValue) {
-          Commission += order.AvgFillPrice * order.Quantity * CommissionFee.Value;
+          commission = order.AvgFillPrice * order.Quantity * CommissionFee.Value;
+          Commission += commission.Value;
           if (Commission >= BuyThreshold.Value) {
             quantity = Commission / CommissionMarket.CurrentPrice;
             Commission = 0;
@@ -29,6 +31,7 @@ namespace PiTrade.Strategy.Util {
       if (CommissionMarket != null && quantity.HasValue) { 
         await CommissionMarket.CreateMarketOrder(OrderSide.BUY, quantity.Value);
       }
+      return commission;
     }
   }
 }

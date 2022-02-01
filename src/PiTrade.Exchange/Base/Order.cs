@@ -142,7 +142,6 @@ namespace PiTrade.Exchange.Base {
         if (disposing) {
           // TODO: dispose managed state (managed objects)
         }
-        Log.Info($"Dispose Order [{GetHashCode()}][{ToString()}]");
         Cancel().Wait(5000);
         disposedValue = true;
       }

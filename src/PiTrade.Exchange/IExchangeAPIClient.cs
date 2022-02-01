@@ -9,6 +9,7 @@ using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public interface IExchangeAPIClient {
+    string Name { get; }
     decimal CommissionFee { get; }
     Task<MarketDTO[]> FetchMarkets();
     Task<OrderDTO?> CreateMarketOrder(IMarket market, OrderSide side, decimal quantity);

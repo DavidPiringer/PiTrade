@@ -28,6 +28,7 @@ namespace PiTrade.Exchange.Binance {
       set { lock (locker) { ping = value; } }
     }
 
+    public string Name => "Binance";
     public decimal CommissionFee => 0.0075m;
 
 
