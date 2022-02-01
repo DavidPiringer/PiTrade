@@ -175,7 +175,6 @@ namespace PiTrade.Strategy {
         await CommissionManager.ManageCommission(o);
         ClearGrids(hits);
         Log.Info($"SOLD [{o}]");
-        PrintGrids();
         Profit?.Invoke(this, o.Amount - buyOrder.Amount);
       });
 
