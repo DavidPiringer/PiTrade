@@ -9,6 +9,7 @@ using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
+using PiTrade.Strategy.ConfigDTOs;
 using PiTrade.Strategy.Util;
 
 namespace PiTrade.Strategy {
@@ -34,7 +35,7 @@ namespace PiTrade.Strategy {
     }
 
     private bool isEnabled;
-    public bool IsEnabled { 
+    public bool IsEnabled {
       get => isEnabled;
       private set {
         isEnabled = value;
@@ -55,13 +56,23 @@ namespace PiTrade.Strategy {
     private decimal LastPrice { get; set; } = decimal.MinValue;
 
     public static decimal Profit { get; private set; }
-         
+
     // TODO: add "WhenError" for orders -> put order creation on market into order
     // TODO: add "HandleCommission" for market -> handles commission and maybe change quantity of order
 
     // TODO: overseer strategy -> watches all markets -> good uptrends -> start grid trading
+    public GridTradingStrategy(IMarket market, GridTradingStrategyConfig config) :
+      this(market, 
+        config.MinQuotePerGrid, config.ReinvestProfitRatio, 
+        config.HighPrice, config.LowPrice, 
+        config.GridCount, config.SellThreshold, 
+        config.AutoDisable) { }
 
-    public GridTradingStrategy(IMarket market, decimal minQuotePerGrid, decimal reinvestProfitRatio, decimal highPrice, decimal lowPrice, uint gridCount, decimal sellThreshold, bool autoDisable = true) /*: base(market)*/ {
+    public GridTradingStrategy(IMarket market,
+      decimal minQuotePerGrid, decimal reinvestProfitRatio,
+      decimal highPrice, decimal lowPrice,
+      uint gridCount, decimal sellThreshold,
+      bool autoDisable = true) {
       if (lowPrice > highPrice)
         throw new ArgumentException("LowPrice has to be lower than HighPrice.");
 
@@ -102,7 +113,7 @@ namespace PiTrade.Strategy {
           restQuantity += await GetRestQuantityAndCancel(grid.SellOrder);
         }
 
-        if(restQuantity > 0)
+        if (restQuantity > 0)
           await market.CreateMarketOrder(OrderSide.SELL, restQuantity);
       }
     }
@@ -116,16 +127,16 @@ namespace PiTrade.Strategy {
     }
 
     private async Task OnPriceChanged(IMarket market, decimal price) {
-      if(!IsEnabled) return;
+      if (!IsEnabled) return;
 
       if (autoDisable && (price > highPrice || lowPrice > price))
         await Disable();
 
       Grid[] hits = new Grid[0];
-      lock(locker) {
-        hits = grids.Where(x => 
-          LastPrice > x.Price && 
-          x.Price >= price && 
+      lock (locker) {
+        hits = grids.Where(x =>
+          LastPrice > x.Price &&
+          x.Price >= price &&
           x.IsFree).ToArray();
 
         LastPrice = price;
@@ -158,7 +169,7 @@ namespace PiTrade.Strategy {
       });
 
       await order.WhenCanceled(o => {
-        lock(locker) ClearGrids(hits);
+        lock (locker) ClearGrids(hits);
       });
     }
 
@@ -181,12 +192,12 @@ namespace PiTrade.Strategy {
       await order.WhenFilled(async o => {
         var sellCommission = await CommissionManager.ManageCommission(o);
         lock (locker) {
-          if(sellCommission.HasValue && buyCommission.HasValue) {
+          if (sellCommission.HasValue && buyCommission.HasValue) {
             var profit = o.Amount - buyOrder.Amount - sellCommission.Value - buyCommission.Value;
             Profit += profit;
             var addedProfitPerGrid = Profit / hits.Count() * reinvestProfitRatio;
             foreach (var hit in hits) {
-              if(hit.Quote + addedProfitPerGrid > minQuotePerGrid)
+              if (hit.Quote + addedProfitPerGrid > minQuotePerGrid)
                 hit.Quote += addedProfitPerGrid;
             }
           }

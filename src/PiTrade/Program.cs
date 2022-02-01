@@ -1,4 +1,5 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PiTrade.Exchange;
 using PiTrade.Exchange.Base;
@@ -7,6 +8,7 @@ using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
 using PiTrade.Strategy;
+using PiTrade.Strategy.ConfigDTOs;
 using PiTrade.Strategy.Util;
 
 var configPath = args.FirstOrDefault(@"C:\Users\David\Documents\binanceConfig.json");
@@ -27,8 +29,17 @@ if (market != null && commissionMarket != null) {
   CommissionManager.CommissionMarket = commissionMarket;
   CommissionManager.CommissionFee = client.CommissionFee;
   CommissionManager.BuyThreshold = 15m;
-  var strategy = new GridTradingStrategy(market, 10.0m, 0.5m, 3100m, 2500m, 100, 0.005m, false); 
-  strategy.Enable();
+
+  GridTradingStrategyConfig? strategyConfig = JsonConvert.DeserializeObject<GridTradingStrategyConfig>(args.Last());
+  if(strategyConfig != null) {
+    var strategy = new GridTradingStrategy(market, strategyConfig);
+    strategy.Enable();
+  } else {
+    Log.Error("No related config for strategy found. Created a empty template named 'strategyConfig.json'"); 
+    File.WriteAllText("strategyConfig.json", JsonConvert.SerializeObject(new GridTradingStrategyConfig()));
+  }
+  //var strategy = new GridTradingStrategy(market, 10.0m, 0.5m, 3050m, 2700m, 100, 0.005m, false); 
+  
 }
 
 await exchange.Run(CancellationToken.None);
