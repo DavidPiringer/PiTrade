@@ -29,7 +29,7 @@ namespace PiTrade.Exchange.Binance {
     }
 
     public string Name => "Binance";
-    public decimal CommissionFee => 0.0075m;
+    public decimal CommissionFee => 0.00075m;
 
 
     public BinanceStreamAPIClient(string key, string secret) {
