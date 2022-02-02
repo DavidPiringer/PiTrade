@@ -30,7 +30,7 @@ namespace PiTrade.Exchange.Binance {
 
     public string Name => "Binance";
     public decimal CommissionFee => 0.00075m;
-
+    public uint MaxMarketCountPerStream => 1024;
 
     public BinanceStreamAPIClient(string key, string secret) {
       this.secret = secret;
@@ -147,6 +147,9 @@ namespace PiTrade.Exchange.Binance {
     public async Task<WebSocket<ITradeUpdate>> GetStream(params IMarket[] markets) => await Task.Run(async () => {
       if (markets.Length == 0)
         throw new ArgumentException("Cannot start a stream with an empty market array");
+      if (markets.Length > MaxMarketCountPerStream)
+        throw new ArgumentException($"Cannot start a stream with more than {MaxMarketCountPerStream} markets.");
+
       var ws = new WebSocket<ITradeUpdate>(new Uri(WSBaseUri), WebSocketTransformFnc);
       await ws.SendMessage(
         "{\"method\": \"SUBSCRIBE\", \"params\": [" + 

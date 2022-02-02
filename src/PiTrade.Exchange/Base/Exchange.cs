@@ -17,15 +17,17 @@ namespace PiTrade.Exchange.Base {
     private readonly List<IMarket> subscribedMarkets = new List<IMarket>();
     private readonly TimeSpan fetchMarketsUpdateInterval;
     private readonly SemaphoreSlim semaphore = new SemaphoreSlim(0);
+    private readonly bool finishMarketSubscriptionOnRun;
     private IMarket[]? markets;
 
     private DateTime lastFetchmarketsUpdate = DateTime.MinValue;
 
     public Exchange(IExchangeStreamClient api) : this(api, TimeSpan.FromMinutes(5)) { }
 
-    public Exchange(IExchangeStreamClient api, TimeSpan fetchMarketsUpdateInterval) {
+    public Exchange(IExchangeStreamClient api, TimeSpan fetchMarketsUpdateInterval, bool finishMarketSubscriptionOnRun = true) {
       this.api = api;
       this.fetchMarketsUpdateInterval = fetchMarketsUpdateInterval;
+      this.finishMarketSubscriptionOnRun = finishMarketSubscriptionOnRun;
     }
 
     public async Task<IMarket[]> GetMarkets() {
@@ -39,8 +41,8 @@ namespace PiTrade.Exchange.Base {
 
     public async Task Subscribe(params IMarket[] markets) {
       subscribedMarkets.AddRange(markets);
-      var webSocket = await api.GetStream(markets);
-      EnqueueLoop(webSocket);
+      if (!finishMarketSubscriptionOnRun)
+        await StartMarketStreams(markets);
     }
 
     private void EnqueueLoop(WebSocket<ITradeUpdate> webSocket) => 
@@ -60,7 +62,21 @@ namespace PiTrade.Exchange.Base {
     private async Task<IMarket[]> FetchMarkets() =>
       (await api.FetchMarkets()).Select(x => new Market(this, api, x)).ToArray();
 
+    private async Task StartMarketStreams(IEnumerable<IMarket> markets) {
+      var marketArr = markets.ToArray();
+      var step = (int)api.MaxMarketCountPerStream;
+      for (int i = 0; i < marketArr.Length; i += step) {
+        var length = Math.Min(marketArr.Length - i, step);
+        var webSocket = await api.GetStream(marketArr.AsSpan(i, length).ToArray());
+        EnqueueLoop(webSocket);
+      }
+    }
+
     public async Task Run(CancellationToken cancellationToken) {
+      // start websocket for subscribedMarkets
+      if(finishMarketSubscriptionOnRun)
+        await StartMarketStreams(subscribedMarkets);
+
       //IList<Task> tasks = new List<Task>();
       while (!cancellationToken.IsCancellationRequested) {
         await semaphore.WaitAsync(cancellationToken);

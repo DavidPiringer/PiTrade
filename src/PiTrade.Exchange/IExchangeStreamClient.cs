@@ -7,6 +7,7 @@ using PiTrade.Networking;
 
 namespace PiTrade.Exchange {
   public interface IExchangeStreamClient : IExchangeAPIClient {
+    uint MaxMarketCountPerStream { get; }
     Task<WebSocket<ITradeUpdate>> GetStream(params IMarket[] markets);
   }
 }
