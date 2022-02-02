@@ -16,7 +16,7 @@ using PiTrade.Networking;
 namespace PiTrade.Exchange.Binance {
   public class BinanceStreamAPIClient : IExchangeStreamClient {
     private const string BaseUri = "https://api.binance.com";
-    private const string WSBaseUri = "wss://stream.binance.com:9443";
+    private const string WSBaseUri = "wss://stream.binance.com:9443/ws";
     private readonly string secret;
     private readonly HttpClient client;
     private readonly object locker = new object();
@@ -144,12 +144,15 @@ namespace PiTrade.Exchange.Binance {
       };
     }
 
-    public async Task<WebSocket<ITradeUpdate>> GetStream(params IMarket[] markets) => await Task.Run(() => {
+    public async Task<WebSocket<ITradeUpdate>> GetStream(params IMarket[] markets) => await Task.Run(async () => {
       if (markets.Length == 0)
         throw new ArgumentException("Cannot start a stream with an empty market array");
-      string uri = $"{WSBaseUri}/stream?streams={string.Join("/", markets.Select(x => $"{MarketString(x).ToLower()}@trade"))}";
-
-      return new WebSocket<ITradeUpdate>(new Uri(uri), WebSocketTransformFnc);
+      var ws = new WebSocket<ITradeUpdate>(new Uri(WSBaseUri), WebSocketTransformFnc);
+      await ws.SendMessage(
+        "{\"method\": \"SUBSCRIBE\", \"params\": [" + 
+            string.Join(",", markets.Select(x => $"\"{MarketString(x).ToLower()}@trade\"")) + 
+         "], \"id\": 1}");
+      return ws;
     });
 
 
@@ -157,12 +160,12 @@ namespace PiTrade.Exchange.Binance {
     private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
 
     private ITradeUpdate? WebSocketTransformFnc(string msg) {
-      var data = JsonConvert.DeserializeObject<StreamData>(msg);
-      if(data != null && data.Update != null && data.Update.Symbol != null && 
-        symbolMap.TryGetValue(data.Update.Symbol.ToUpper(), out (Symbol Asset, Symbol Quote) tpl)) {
-        data.Update.Asset = tpl.Asset;
-        data.Update.Quote = tpl.Quote;
-        return data.Update;
+      var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
+      if(update != null && update.Symbol != null && 
+        symbolMap.TryGetValue(update.Symbol.ToUpper(), out (Symbol Asset, Symbol Quote) tpl)) {
+        update.Asset = tpl.Asset;
+        update.Quote = tpl.Quote;
+        return update;
       }
       return null;
     }
