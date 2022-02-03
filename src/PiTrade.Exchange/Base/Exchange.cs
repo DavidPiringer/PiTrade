@@ -16,11 +16,10 @@ namespace PiTrade.Exchange.Base {
     private readonly ConcurrentQueue<ITradeUpdate> tradeUpdates = new ConcurrentQueue<ITradeUpdate>();
     private readonly List<IMarket> subscribedMarkets = new List<IMarket>();
     private readonly TimeSpan fetchMarketsUpdateInterval;
-    private readonly SemaphoreSlim semaphore = new SemaphoreSlim(0);
     private readonly bool finishMarketSubscriptionOnRun;
-    private IMarket[]? markets;
+    private readonly IList<IMarket> markets = new List<IMarket>();
 
-    private DateTime lastFetchmarketsUpdate = DateTime.MinValue;
+    private DateTime lastFetchMarketsUpdate = DateTime.MinValue;
 
     public Exchange(IExchangeStreamClient api) : this(api, TimeSpan.FromMinutes(5)) { }
 
@@ -31,9 +30,9 @@ namespace PiTrade.Exchange.Base {
     }
 
     public async Task<IMarket[]> GetMarkets() {
-      if (markets == null)
-        markets = await FetchMarkets();
-      return markets;
+      if (!markets.Any())
+        await UpdateMarkets();
+      return markets.ToArray();
     }
 
     public async Task<IMarket?> GetMarket(Symbol asset, Symbol quote) =>
@@ -49,18 +48,13 @@ namespace PiTrade.Exchange.Base {
       webSocket.NextMessage().ContinueWith(t => {
         t.Wait();
         (ITradeUpdate? update, bool success) = t.Result;
-        if (success && update != null) {
+        if (success && update != null)
           tradeUpdates.Enqueue(update);
-          //semaphore.Release();
-        }
         EnqueueLoop(webSocket);
       });
       
     private IMarket? SearchMarket(IEnumerable<IMarket> m, Symbol asset, Symbol quote) =>
       m.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
-
-    private async Task<IMarket[]> FetchMarkets() =>
-      (await api.FetchMarkets()).Select(x => new Market(this, api, x)).ToArray();
 
     private async Task StartMarketStreams(IMarket[] marketArr) {
       var step = (int)api.MaxMarketCountPerStream;
@@ -77,9 +71,7 @@ namespace PiTrade.Exchange.Base {
       if (finishMarketSubscriptionOnRun)
         await StartMarketStreams(marketArr);
 
-      //IList<Task> tasks = new List<Task>();
       while (!cancellationToken.IsCancellationRequested) {
-        //await semaphore.WaitAsync(cancellationToken);
                
         // update markets
         if (tradeUpdates.TryDequeue(out ITradeUpdate? update) && update != null) {
@@ -89,12 +81,24 @@ namespace PiTrade.Exchange.Base {
         }
 
         // fetch markets
-        if (lastFetchmarketsUpdate.Add(fetchMarketsUpdateInterval) < DateTime.Now) {
-          lastFetchmarketsUpdate = DateTime.Now;
-          markets = await FetchMarkets();
+        if (lastFetchMarketsUpdate.Add(fetchMarketsUpdateInterval) < DateTime.Now) {
+          lastFetchMarketsUpdate = DateTime.Now;
+          await UpdateMarkets();
         }
-        //Task.WaitAll(tasks.ToArray());
-        //tasks.Clear();
+      }
+    }
+
+    private async Task UpdateMarkets() {
+      var dtos = await api.FetchMarkets();
+      foreach (var dto in dtos) {
+        bool marketExists = false;
+        foreach(var market in markets) {
+          if(market.Asset == dto.Asset && market.Quote == dto.Quote) {
+            marketExists = true;
+            // update market
+          }
+        }
+        if(!marketExists) markets.Add(new Market(this, api, dto));
       }
     }
   }
