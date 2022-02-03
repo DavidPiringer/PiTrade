@@ -39,9 +39,7 @@ namespace PiTrade.Exchange.Base {
         var dto = await api.CreateMarketOrder(this, side, qty);
         if (dto.HasValue) {
           var o = dto.Value;
-          o.ExecutedAmount = 0;
-          o.ExecutedQuantity = 0;
-          o.AvgFillPrice = 0;
+          o.Market = this;
           o.Quantity = qty;
           o.TargetPrice = price;
           o.Side = side;
@@ -59,9 +57,6 @@ namespace PiTrade.Exchange.Base {
         if (dto.HasValue) {
           var o = dto.Value;
           o.Market = this;
-          o.ExecutedAmount = 0;
-          o.ExecutedQuantity = 0;
-          o.AvgFillPrice = 0;
           o.Quantity = qty;
           o.TargetPrice = p;
           o.Side = side;

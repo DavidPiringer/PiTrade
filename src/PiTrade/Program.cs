@@ -34,9 +34,7 @@ if (market != null && commissionMarket != null) {
   if(strategyConfig != null) {
     var strategy = new GridTradingStrategy(market, strategyConfig);
     strategy.Enable();
-  }
-  //var strategy = new GridTradingStrategy(market, 10.0m, 0.5m, 3050m, 2700m, 100, 0.005m, false); 
-  
+  }  
 }
 
 await exchange.Run(CancellationToken.None);

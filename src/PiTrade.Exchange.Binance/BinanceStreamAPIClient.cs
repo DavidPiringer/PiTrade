@@ -59,7 +59,7 @@ namespace PiTrade.Exchange.Binance {
       });
       if (response == null || response.Id == -1)
         return null;
-      return new OrderDTO() { Id = response.Id };
+      return CreateOrderDTO(market, response);
     }
 
     public async Task<OrderDTO?> CreateMarketOrder(IMarket market, OrderSide side, decimal quantity) {
@@ -72,7 +72,7 @@ namespace PiTrade.Exchange.Binance {
       });
       if (response == null || response.Id == -1)
         return null;
-      return new OrderDTO() { Id = response.Id };
+      return CreateOrderDTO(market, response);
     }
 
     public async Task<MarketDTO[]> FetchMarkets() {
@@ -117,31 +117,11 @@ namespace PiTrade.Exchange.Binance {
         {"symbol", MarketString(market) },
         {"orderId", orderId.ToString()}
       });
-      if (response == null || response.Id == -1)
+      if (response == null || response.Id != -1)
         return null;
-      decimal avgFillPrice = 0m;
-      decimal executedQuantity = 0m;
-      if(response.Fills != null) {
-        avgFillPrice = response.Fills.Sum(x => x.Price) / response.Fills.Count();
-        executedQuantity = response.Fills.Sum(x => x.Quantity);
-      }
-      var state = OrderState.Open;
-      if(response.Status != null) {
-        state = response.Status.ToUpper() switch {
-          "NEW" => OrderState.Open,
-          "FILLED" => OrderState.Filled,
-          "CANCELED" => OrderState.Canceled,
-          _ => OrderState.Faulted
-        };
-      }
-      return new OrderDTO() { 
-        Id = response.Id, 
-        Market = market, 
-        AvgFillPrice = avgFillPrice, 
-        ExecutedQuantity = executedQuantity,
-        ExecutedAmount = avgFillPrice * executedQuantity,
-        State = state
-      };
+      return CreateOrderDTO(market, response);
+
+
     }
 
     public async Task<WebSocket<ITradeUpdate>> GetStream(params IMarket[] markets) => await Task.Run(async () => {
@@ -160,9 +140,32 @@ namespace PiTrade.Exchange.Binance {
 
 
     #region Helper
+    private OrderDTO CreateOrderDTO(IMarket market, BinanceOrder order) {
+      var state = OrderState.Open;
+      if (order.Status != null) {
+        state = order.Status.ToUpper() switch {
+          "NEW" => OrderState.Open,
+          "FILLED" => OrderState.Filled,
+          "CANCELED" => OrderState.Canceled,
+          _ => OrderState.Faulted
+        };
+      }
+
+      decimal avgFillPrice = order.ExecutedQuantity > 0 ? 
+        order.CummulativeQuoteQty / order.ExecutedQuantity : 0m;
+
+      return new OrderDTO() {
+        Id = order.Id,
+        Market = market,
+        AvgFillPrice = avgFillPrice,
+        ExecutedQuantity = order.ExecutedQuantity,
+        State = state
+      };
+    }
+
     private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
 
-    private ITradeUpdate? WebSocketTransformFnc(string msg) {
+    private ITradeUpdate? WebSocketTransformFnc(string msg) { // TODO: improve with Imarkets
       var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);
       if(update != null && update.Symbol != null && 
         symbolMap.TryGetValue(update.Symbol.ToUpper(), out (Symbol Asset, Symbol Quote) tpl)) {

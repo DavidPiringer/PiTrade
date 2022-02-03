@@ -195,7 +195,7 @@ namespace PiTrade.Strategy {
         var sellCommission = await CommissionManager.ManageCommission(o);
         lock (locker) {
           if (sellCommission.HasValue && buyCommission.HasValue) {
-            var profit = o.Amount - buyOrder.Amount - sellCommission.Value - buyCommission.Value;
+            var profit = o.ExecutedAmount - buyOrder.ExecutedAmount - sellCommission.Value - buyCommission.Value;
             Profit += profit;
             var addedProfitPerGrid = Profit / hits.Count() * reinvestProfitRatio;
             foreach (var hit in hits) {

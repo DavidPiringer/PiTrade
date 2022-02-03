@@ -23,8 +23,8 @@ namespace PiTrade.Exchange.Base {
     public OrderSide Side { get; private set; }
     public decimal TargetPrice { get; private set; }
     public decimal Quantity { get; private set; }
-    public decimal Amount { get; private set; }
-    public decimal ExecutedAmount { get; private set; }
+    public decimal Amount => Quantity * TargetPrice;
+    public decimal ExecutedAmount => ExecutedQuantity * AvgFillPrice;
     public decimal ExecutedQuantity { get; private set; }
     public decimal AvgFillPrice { get; private set; }
     public OrderState State { get; private set; }
@@ -40,7 +40,7 @@ namespace PiTrade.Exchange.Base {
       var order = new Order(api, market);
       market.Register2TradeUpdates(order.OnTradeUpdate);
       var dto = await creationFnc();
-      order.Init(market, dto.Value);
+      order.Init(market, dto);
       return order;
     }
 
@@ -65,8 +65,6 @@ namespace PiTrade.Exchange.Base {
       if (State == OrderState.Open && update.Match(Id)) {
         ExecutedQuantity += update.Quantity;
         AvgFillPrice += update.Price * (update.Quantity / Quantity);
-        ExecutedAmount = AvgFillPrice * ExecutedQuantity;
-        Amount = AvgFillPrice * ExecutedQuantity;
         if (Quantity <= ExecutedQuantity) {
           State = OrderState.Filled;
           await ExecuteWhenActions(whenFilledActions);
@@ -77,7 +75,6 @@ namespace PiTrade.Exchange.Base {
     private async Task UpdateSelf() {
       var dto = await api.GetOrder(Market, Id);
       if (dto.HasValue) {
-        ExecutedAmount = dto.Value.ExecutedAmount;
         ExecutedQuantity = dto.Value.ExecutedQuantity;
         AvgFillPrice = dto.Value.AvgFillPrice;
         State = dto.Value.State;
