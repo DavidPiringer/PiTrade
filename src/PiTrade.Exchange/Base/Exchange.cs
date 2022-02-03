@@ -51,7 +51,7 @@ namespace PiTrade.Exchange.Base {
         (ITradeUpdate? update, bool success) = t.Result;
         if (success && update != null) {
           tradeUpdates.Enqueue(update);
-          semaphore.Release();
+          //semaphore.Release();
         }
         EnqueueLoop(webSocket);
       });
@@ -62,8 +62,7 @@ namespace PiTrade.Exchange.Base {
     private async Task<IMarket[]> FetchMarkets() =>
       (await api.FetchMarkets()).Select(x => new Market(this, api, x)).ToArray();
 
-    private async Task StartMarketStreams(IEnumerable<IMarket> markets) {
-      var marketArr = markets.ToArray();
+    private async Task StartMarketStreams(IMarket[] marketArr) {
       var step = (int)api.MaxMarketCountPerStream;
       for (int i = 0; i < marketArr.Length; i += step) {
         var length = Math.Min(marketArr.Length - i, step);
@@ -73,17 +72,19 @@ namespace PiTrade.Exchange.Base {
     }
 
     public async Task Run(CancellationToken cancellationToken) {
+      var marketArr = subscribedMarkets.ToArray();
       // start websocket for subscribedMarkets
-      if(finishMarketSubscriptionOnRun)
-        await StartMarketStreams(subscribedMarkets);
+      if (finishMarketSubscriptionOnRun)
+        await StartMarketStreams(marketArr);
 
       //IList<Task> tasks = new List<Task>();
       while (!cancellationToken.IsCancellationRequested) {
-        await semaphore.WaitAsync(cancellationToken);
+        //await semaphore.WaitAsync(cancellationToken);
                
         // update markets
         if (tradeUpdates.TryDequeue(out ITradeUpdate? update) && update != null) {
-          var market = SearchMarket(subscribedMarkets.ToArray(), update.Asset, update.Quote);
+          var markets = finishMarketSubscriptionOnRun ? marketArr : subscribedMarkets.ToArray();
+          var market = SearchMarket(markets, update.Asset, update.Quote);
           if(market != null && market is Market m) await m.Update(update);
         }
 
