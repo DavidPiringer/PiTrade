@@ -59,7 +59,6 @@ namespace PiTrade.Strategy {
 
     // TODO: add "WhenError" for orders -> put order creation on market into order
     // TODO: add "HandleCommission" for market -> handles commission and maybe change quantity of order
-
     // TODO: overseer strategy -> watches all markets -> good uptrends -> start grid trading
     public GridTradingStrategy(IMarket market, GridTradingStrategyConfig config) :
       this(market, 

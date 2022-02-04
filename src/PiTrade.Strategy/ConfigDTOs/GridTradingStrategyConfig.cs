@@ -8,6 +8,8 @@ using Newtonsoft.Json;
 namespace PiTrade.Strategy.ConfigDTOs {
   [JsonObject(MemberSerialization.OptOut)]
   public class GridTradingStrategyConfig {
+    public string? Asset { get; set; }
+    public string? Quote { get; set; }
     public decimal MinQuotePerGrid { get; set; }
     public decimal ReinvestProfitRatio { get; set; }
     public decimal HighPrice { get; set; }
