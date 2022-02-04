@@ -87,8 +87,6 @@ namespace PiTrade.Exchange.Binance {
           if (symbol.BaseAsset != null &&
               symbol.QuoteAsset != null &&
               symbol.Filters != null &&
-              symbol.IsSpotTradingAllowed.HasValue &&
-              symbol.IsSpotTradingAllowed.Value &&
               symbol.MarketString != null) {
 
             var assetPrecision = symbol.AssetPrecision;
