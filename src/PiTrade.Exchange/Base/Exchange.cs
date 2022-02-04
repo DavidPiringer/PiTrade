@@ -17,6 +17,7 @@ namespace PiTrade.Exchange.Base {
     private readonly List<IMarket> subscribedMarkets = new List<IMarket>();
     private readonly TimeSpan fetchMarketsUpdateInterval;
     private readonly bool finishMarketSubscriptionOnRun;
+    private readonly SemaphoreSlim semaphore = new SemaphoreSlim(0);
     private readonly IList<IMarket> markets = new List<IMarket>();
 
     private DateTime lastFetchMarketsUpdate = DateTime.MinValue;
@@ -48,8 +49,10 @@ namespace PiTrade.Exchange.Base {
       webSocket.NextMessage().ContinueWith(t => {
         t.Wait();
         (ITradeUpdate? update, bool success) = t.Result;
-        if (success && update != null)
+        if (success && update != null) {
           tradeUpdates.Enqueue(update);
+          semaphore.Release();
+        }
         EnqueueLoop(webSocket);
       });
       
@@ -68,16 +71,18 @@ namespace PiTrade.Exchange.Base {
     public async Task Run(CancellationToken cancellationToken) {
       var marketArr = subscribedMarkets.ToArray();
       // start websocket for subscribedMarkets
-      if (finishMarketSubscriptionOnRun)
+      if (finishMarketSubscriptionOnRun) // add this logic into binanceClient?
         await StartMarketStreams(marketArr);
 
       while (!cancellationToken.IsCancellationRequested) {
-               
+        // wait for semaphore to prevent the loop running without updates
+        await semaphore.WaitAsync(cancellationToken);
+
         // update markets
         if (tradeUpdates.TryDequeue(out ITradeUpdate? update) && update != null) {
           var markets = finishMarketSubscriptionOnRun ? marketArr : subscribedMarkets.ToArray();
           var market = SearchMarket(markets, update.Asset, update.Quote);
-          if(market != null && market is Market m) await m.Update(update);
+          if (market != null && market is Market m) await m.Update(update);
         }
 
         // fetch markets
