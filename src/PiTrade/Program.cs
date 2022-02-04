@@ -22,18 +22,28 @@ if (key == null || secret == null)
 
 var client = new BinanceStreamAPIClient(key, secret);
 var exchange = new Exchange(client);
-var market = await exchange.GetMarket(Symbol.ETH, Symbol.USDT);
 var commissionMarket = await exchange.GetMarket(Symbol.BNB, Symbol.USDT);
-if (market != null && commissionMarket != null) {
-  await exchange.Subscribe(market, commissionMarket);
+
+if (commissionMarket != null) {
   CommissionManager.CommissionMarket = commissionMarket;
   CommissionManager.CommissionFee = client.CommissionFee;
   CommissionManager.BuyThreshold = 15m;
 
-  GridTradingStrategyConfig? strategyConfig = JsonConvert.DeserializeObject<GridTradingStrategyConfig>(File.ReadAllText(args.Last()));
-  if(strategyConfig != null) {
-    var strategy = new GridTradingStrategy(market, strategyConfig);
-    strategy.Enable();
+  // TODO: maxActiveGrids?
+  // TODO: multiple grid trading strategies
+  // TODO: add buffer to websocket send
+ var configs = JsonConvert.DeserializeObject<GridTradingStrategyConfig[]>(File.ReadAllText(args.Last()));
+  if(configs != null) {
+    foreach(var c in configs) {
+      if(c.Asset != null && c.Quote != null) {
+        var market = await exchange.GetMarket(new Symbol(c.Asset), new Symbol(c.Quote));
+        if(market != null) {
+          await exchange.Subscribe(market);
+          var strategy = new GridTradingStrategy(market, c);
+          strategy.Enable();
+        }
+      }
+    }
   }  
 }
 
