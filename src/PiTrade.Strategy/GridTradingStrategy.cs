@@ -196,7 +196,7 @@ namespace PiTrade.Strategy {
           if (sellCommission.HasValue && buyCommission.HasValue) {
             var profit = o.ExecutedAmount - buyOrder.ExecutedAmount - sellCommission.Value - buyCommission.Value;
             Profit += profit;
-            var addedProfitPerGrid = Profit / hits.Count() * reinvestProfitRatio;
+            var addedProfitPerGrid = profit / hits.Count() * reinvestProfitRatio;
             foreach (var hit in hits) {
               if (hit.Quote + addedProfitPerGrid > minQuotePerGrid)
                 hit.Quote += addedProfitPerGrid;
