@@ -95,8 +95,8 @@ namespace PiTrade.Exchange.Base {
     public async Task Cancel() {
       if (State != OrderState.Filled && State != OrderState.Canceled) {
         State = OrderState.Canceled;
-        await ExecuteWhenActions(whenCanceledActions);
         await ExponentialBackoff.Try(async () => await api.CancelOrder(Market, Id));
+        await ExecuteWhenActions(whenCanceledActions);
       }
     }
 

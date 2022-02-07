@@ -110,21 +110,17 @@ namespace PiTrade.Strategy {
       if (sellAll) {
         decimal restQuantity = 0m;
         foreach (var grid in grids) {
-          restQuantity += await GetRestQuantityAndCancel(grid.BuyOrder);
-          restQuantity += await GetRestQuantityAndCancel(grid.SellOrder);
+          await CancelAndSell(grid.BuyOrder);
+          await CancelAndSell(grid.SellOrder);
         }
-
-        if (restQuantity > 0)
-          await market.CreateMarketOrder(OrderSide.SELL, restQuantity);
       }
     }
 
-    private async Task<decimal> GetRestQuantityAndCancel(IOrder? order) {
+    private async Task CancelAndSell(IOrder? order) {
       if (order != null && order.State == OrderState.Open) {
         await order.Cancel();
-        return order.ExecutedQuantity;
+        await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
       }
-      return 0m;
     }
 
     private async Task OnPriceChanged(IMarket market, decimal price) {
