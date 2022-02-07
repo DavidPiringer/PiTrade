@@ -34,15 +34,6 @@ namespace PiTrade.Strategy {
       public override string ToString() => $"GRID Price = [{Price}] | BuyOrder = [{BuyOrder}] | SellOrder = [{SellOrder}]";
     }
 
-    private bool isEnabled;
-    public bool IsEnabled {
-      get => isEnabled;
-      private set {
-        isEnabled = value;
-        //EnableChanged?.Invoke(this, value);
-      }
-    }
-
     private readonly IMarket market;
     private readonly decimal minQuotePerGrid;
     private readonly decimal reinvestProfitRatio;
@@ -55,11 +46,10 @@ namespace PiTrade.Strategy {
 
     private decimal LastPrice { get; set; } = decimal.MinValue;
 
+    public bool IsEnabled { get; set; }
+
     public static decimal Profit { get; private set; }
 
-    // TODO: add "WhenError" for orders -> put order creation on market into order
-    // TODO: add "HandleCommission" for market -> handles commission and maybe change quantity of order
-    // TODO: overseer strategy -> watches all markets -> good uptrends -> start grid trading
     public GridTradingStrategy(IMarket market, GridTradingStrategyConfig config) :
       this(market, 
         config.MinQuotePerGrid, config.ReinvestProfitRatio, 
@@ -111,12 +101,15 @@ namespace PiTrade.Strategy {
         foreach (var grid in grids) {
           await CancelAndSell(grid.BuyOrder);
           await CancelAndSell(grid.SellOrder);
+          grid.BuyOrder = null;
+          grid.SellOrder = null;
         }
       }
     }
 
     private async Task CancelAndSell(IOrder? order) {
       if (order != null && order.State == OrderState.Open) {
+        Log.Warn($"[{market.Asset}{market.Quote}] Cancel & Sell [{order}]");
         await order.Cancel();
         await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
       }
@@ -199,7 +192,6 @@ namespace PiTrade.Strategy {
           }
           ClearGrids(hits);
         }
-        //Profit?.Invoke(this, o.Amount - buyOrder.Amount);
         Log.Info($"SOLD [{o}] Profit = {Profit}");
       });
 
