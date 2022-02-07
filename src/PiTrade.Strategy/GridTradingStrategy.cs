@@ -108,7 +108,6 @@ namespace PiTrade.Strategy {
       market.Unregister2PriceChanges(OnPriceChanged);
 
       if (sellAll) {
-        decimal restQuantity = 0m;
         foreach (var grid in grids) {
           await CancelAndSell(grid.BuyOrder);
           await CancelAndSell(grid.SellOrder);
