@@ -28,11 +28,12 @@ if (commissionMarket != null) {
   CommissionManager.CommissionMarket = commissionMarket;
   CommissionManager.CommissionFee = client.CommissionFee;
   CommissionManager.BuyThreshold = 15m;
+  await exchange.Subscribe(commissionMarket);
 
   // TODO: maxActiveGrids?
   // TODO: multiple grid trading strategies
   // TODO: add buffer to websocket send
- var configs = JsonConvert.DeserializeObject<GridTradingStrategyConfig[]>(File.ReadAllText(args.Last()));
+  var configs = JsonConvert.DeserializeObject<GridTradingStrategyConfig[]>(File.ReadAllText(args.Last()));
   if(configs != null) {
     foreach(var c in configs) {
       if(c.Asset != null && c.Quote != null) {

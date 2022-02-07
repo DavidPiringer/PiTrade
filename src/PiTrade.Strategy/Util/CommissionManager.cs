@@ -20,7 +20,7 @@ namespace PiTrade.Strategy.Util {
       decimal? commission = null;
       lock (locker) {
         if (CommissionMarket != null && CommissionFee.HasValue && BuyThreshold.HasValue) {
-          commission = order.AvgFillPrice * order.Quantity * CommissionFee.Value;
+          commission = order.ExecutedAmount * CommissionFee.Value;
           Commission += commission.Value;
           if (Commission >= BuyThreshold.Value) {
             quantity = Commission / CommissionMarket.CurrentPrice;
