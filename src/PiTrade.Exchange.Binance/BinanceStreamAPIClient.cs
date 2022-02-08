@@ -42,10 +42,13 @@ namespace PiTrade.Exchange.Binance {
 
     public Task<bool> CancelOrder(IOrder order) => CancelOrder(order.Market, order.Id);
 
-    public async Task<bool> CancelOrder(IMarket market, long orderId) =>
-      await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
+    public async Task<bool> CancelOrder(IMarket market, long orderId) {
+      var res = await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
         { {"symbol", MarketString(market) },
-        {"orderId", orderId.ToString()} }) != null;
+        {"orderId", orderId.ToString()} });
+      return res != null;
+    }
+      
 
     public async Task<OrderDTO?> CreateLimitOrder(IMarket market, OrderSide side, decimal price, decimal quantity) {
       var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
@@ -180,7 +183,7 @@ namespace PiTrade.Exchange.Binance {
     private Task<EmptyJsonResponse?> Send(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
       Send<EmptyJsonResponse>(requestUri, method, query, content);
 
-    private async Task<T?> Send<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
+    private async Task<T?> Send<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) where T : class {
       if (query == null)
         query = new Dictionary<string, object>();
 
@@ -191,7 +194,7 @@ namespace PiTrade.Exchange.Binance {
     private Task<EmptyJsonResponse?> SendSigned(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
       SendSigned<EmptyJsonResponse>(requestUri, method, query, content);
 
-    private async Task<T?> SendSigned<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
+    private async Task<T?> SendSigned<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) where T : class {
       if (query == null)
         query = new Dictionary<string, object>();
 
@@ -199,7 +202,7 @@ namespace PiTrade.Exchange.Binance {
       return await SendRequest<T>($"{requestUri}?{queryString}", method, content);
     }
 
-    private async Task<T?> SendRequest<T>(string requestUri, HttpMethod method, object? content) {
+    private async Task<T?> SendRequest<T>(string requestUri, HttpMethod method, object? content) where T : class {
       using (var request = new HttpRequestMessage(method, $"{BaseUri}{requestUri}")) {
         if (content != null)
           request.Content = new StringContent(
@@ -213,13 +216,13 @@ namespace PiTrade.Exchange.Binance {
             Log.Error(requestUri);
             Log.Error(response);
             Log.Error(json);
+            return null;
           }
-          return typeof(T) != typeof(EmptyJsonResponse) ?
-                 JsonConvert.DeserializeObject<T>(json) : default(T);
+          return JsonConvert.DeserializeObject<T>(json);
         } catch (Exception e) {
           Log.Error(e.Message);
         }
-        return default(T);
+        return null;
       }
     }
 
