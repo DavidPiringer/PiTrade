@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using PiTrade.Exchange;
 using PiTrade.Exchange.Base;
 using PiTrade.Exchange.Binance;
+using PiTrade.Exchange.DTOs;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
@@ -22,7 +23,7 @@ if (key == null || secret == null)
 
 var client = new BinanceStreamAPIClient(key, secret);
 var exchange = new Exchange(client);
-var commissionMarket = await exchange.GetMarket(Symbol.BNB, Symbol.USDT);
+var commissionMarket = await exchange.GetMarket(Symbol.BNB, Symbol.BUSD);
 
 if (commissionMarket != null) {
   CommissionManager.CommissionMarket = commissionMarket;
@@ -33,6 +34,7 @@ if (commissionMarket != null) {
   // TODO: maxActiveGrids?
   // TODO: multiple grid trading strategies
   // TODO: add buffer to websocket send
+  
   var configs = JsonConvert.DeserializeObject<GridTradingStrategyConfig[]>(File.ReadAllText(args.Last()));
   if(configs != null) {
     foreach(var c in configs) {
@@ -45,7 +47,7 @@ if (commissionMarket != null) {
         }
       }
     }
-  }  
+  }
 }
 
 await exchange.Run(CancellationToken.None);
