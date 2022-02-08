@@ -8,6 +8,7 @@ namespace PiTrade.Exchange.Entities {
   public class Symbol {
     // TODO: add static editable symbol cache
     public static Symbol BTC => new Symbol("BTC");
+    public static Symbol BUSD => new Symbol("BUSD");
     public static Symbol ETH => new Symbol("ETH");
     public static Symbol SHIB => new Symbol("SHIB");
     public static Symbol BNB => new Symbol("BNB");
