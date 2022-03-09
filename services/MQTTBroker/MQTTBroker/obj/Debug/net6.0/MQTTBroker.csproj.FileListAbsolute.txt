@@ -1,0 +1,17 @@
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\bin\Debug\net6.0\MQTTBroker.exe
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\bin\Debug\net6.0\MQTTBroker.deps.json
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\bin\Debug\net6.0\MQTTBroker.runtimeconfig.json
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\bin\Debug\net6.0\MQTTBroker.dll
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\bin\Debug\net6.0\MQTTBroker.pdb
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\bin\Debug\net6.0\MQTTnet.dll
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.csproj.AssemblyReference.cache
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.GeneratedMSBuildEditorConfig.editorconfig
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.AssemblyInfoInputs.cache
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.AssemblyInfo.cs
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.csproj.CoreCompileInputs.cache
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.csproj.CopyComplete
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.dll
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\refint\MQTTBroker.dll
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.pdb
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\MQTTBroker.genruntimeconfig.cache
+C:\Repos\PiTrade\services\MQTTBroker\MQTTBroker\obj\Debug\net6.0\ref\MQTTBroker.dll

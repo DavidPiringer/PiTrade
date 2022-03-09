@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "L8Oz4G985bZQsjD3+AAH0pi6zl4HJ81UpEz+tskBhYvFIceub2kJ+AryvrrE9xBHBdnqvK7xRsoPpN1EEPl7eA==",
+  "success": true,
+  "projectFilePath": "C:\\Repos\\PiTrade\\services\\MQTTBroker\\MQTTBroker\\MQTTBroker.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\David\\.nuget\\packages\\mqttnet\\3.1.2\\mqttnet.3.1.2.nupkg.sha512"
+  ],
+  "logs": []
+}

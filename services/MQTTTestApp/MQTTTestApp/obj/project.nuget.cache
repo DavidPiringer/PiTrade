@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "ODwAku4pTDmPvrL1s1UN5iMDJmN7++LCmmnilU2U+45idhrKMu5WVEr+63u8d/NFBw0W8Ycs8RlKVkPVGIhpIQ==",
+  "success": true,
+  "projectFilePath": "C:\\Repos\\PiTrade\\services\\MQTTTestApp\\MQTTTestApp\\MQTTTestApp.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\David\\.nuget\\packages\\mqttnet\\3.1.2\\mqttnet.3.1.2.nupkg.sha512",
+    "C:\\Users\\David\\.nuget\\packages\\mqttnet.extensions.managedclient\\3.1.2\\mqttnet.extensions.managedclient.3.1.2.nupkg.sha512"
+  ],
+  "logs": []
+}
