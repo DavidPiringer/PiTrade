@@ -216,6 +216,7 @@ namespace PiTrade.Exchange.Binance {
             Log.Error(requestUri);
             Log.Error(response);
             Log.Error(json);
+            await Task.Delay(1000);
             return null;
           }
           return JsonConvert.DeserializeObject<T>(json);
