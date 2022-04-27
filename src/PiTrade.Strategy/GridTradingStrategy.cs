@@ -91,12 +91,14 @@ namespace PiTrade.Strategy {
       market.Unregister2PriceChanges(OnPriceChanged);
 
       if (sellAll) {
+        IList<Task> tasks = new List<Task>();
         foreach (var grid in grids) {
-          await CancelAndSell(grid.BuyOrder);
-          await CancelAndSell(grid.SellOrder);
+          tasks.Add(CancelAndSell(grid.BuyOrder));
+          tasks.Add(CancelAndSell(grid.SellOrder));
           grid.BuyOrder = null;
           grid.SellOrder = null;
         }
+        await Task.WhenAll(tasks);
       }
     }
 
