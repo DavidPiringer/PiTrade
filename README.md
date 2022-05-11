@@ -1,4 +1,4 @@
-# Machine-Trading-Platform
+# PiTrade
 
 ![Architecture](docs/Architecture.svg)
 
