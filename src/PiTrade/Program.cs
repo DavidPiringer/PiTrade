@@ -34,6 +34,23 @@ if (commissionMarket != null) {
   // TODO: maxActiveGrids?
   // TODO: multiple grid trading strategies
   // TODO: add buffer to websocket send
+
+  // Fluent API?
+  // Order.For(S1, S2).At(Binance).Sell().Quantity(q).AsLimit().WithPrice(p).Execute()
+
+  // Order.Sell(x, S1).For(y, S2).At(Binance).AsLimit().Execute()
+  //       ^ Qty+Asset ^ Price+Base
+
+  // TODO: SERVICE STUFF -> Branch
+  // PiTrade Exchange Add --Type Binance -Secret abc -Key xyz Name
+  // PiTrade GridTradingStrategy --Opt1 ...
+  // yaml file?
+  /*
+ Exchange:
+  Type: Binance
+  Secret: ...
+  Key: ...
+   */
   
   var configs = JsonConvert.DeserializeObject<GridTradingStrategyConfig[]>(File.ReadAllText(args.Last()));
   if(configs != null) {

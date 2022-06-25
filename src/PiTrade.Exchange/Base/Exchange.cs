@@ -68,6 +68,7 @@ namespace PiTrade.Exchange.Base {
       }
     }
 
+    // TODO: REWORK THIS
     public async Task Run(CancellationToken cancellationToken) {
       var marketArr = subscribedMarkets.ToArray();
       // start websocket for subscribedMarkets
