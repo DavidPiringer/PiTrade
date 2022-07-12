@@ -164,7 +164,7 @@ namespace PiTrade.Exchange.Binance {
       };
     }
 
-    private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
+    private static string MarketString(IMarket market) => $"{market.QuoteAsset}{market.BaseAsset}".ToUpper();
 
     private ITradeUpdate? WebSocketTransformFnc(string msg) { // TODO: improve with Imarkets
       var update = JsonConvert.DeserializeObject<TradeStreamUpdate>(msg);

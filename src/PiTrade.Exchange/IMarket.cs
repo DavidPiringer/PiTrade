@@ -8,22 +8,26 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace PiTrade.Exchange {
+
   public interface IMarket {
-    decimal CurrentPrice { get; }
+    //decimal CurrentPrice { get; }
     IExchange Exchange { get; }
-    Symbol Asset { get; }
-    Symbol Quote { get; }
-    int AssetPrecision { get; }
-    int QuotePrecision { get; }
+    Symbol QuoteAsset { get; }
+    Symbol BaseAsset { get; }
+    int QuoteAssetPrecision { get; }
+    int BaseAssetPrecision { get; }
 
-    Task<IOrder> CreateMarketOrder(OrderSide side, decimal quantity);
-    Task<IOrder> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+    IOrder Sell(decimal quantity);
+    IOrder Buy(decimal quantity);
 
-    void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
-    void Unregister2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
+    //Task<IOrder> CreateMarketOrder(OrderSide side, decimal quantity);
+    //Task<IOrder> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
 
-    void Register2PriceChanges(Func<IMarket, decimal, Task> fnc);
-    void Unregister2PriceChanges(Func<IMarket, decimal, Task> fnc);
+    //void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
+    //void Unregister2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
+
+    //void Register2PriceChanges(Func<IMarket, decimal, Task> fnc);
+    //void Unregister2PriceChanges(Func<IMarket, decimal, Task> fnc);
 
   }
 }

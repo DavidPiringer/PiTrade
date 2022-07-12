@@ -104,7 +104,7 @@ namespace PiTrade.Strategy {
 
     private async Task CancelAndSell(IOrder? order) {
       if (order != null && order.State == OrderState.Open) {
-        Log.Warn($"[{market.Asset}{market.Quote}] Cancel & Sell [{order}]");
+        Log.Warn($"[{market.QuoteAsset}{market.BaseAsset}] Cancel & Sell [{order}]");
         await order.Cancel();
         await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
       }
@@ -132,14 +132,14 @@ namespace PiTrade.Strategy {
     }
 
     private async Task Buy(IMarket market, decimal price, IEnumerable<Grid> hits) {
-      Log.Info($"[{market.Asset}{market.Quote}] BUY (price = {price})");
+      Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] BUY (price = {price})");
 
       var quote = hits.Sum(x => x.Quote);
       var hitCount = hits.Count();
       var quantity = GetQuantity(quote, price) * hitCount;
 
       // adjust quantity to be greater or equal the quotePerGrid
-      while (price.RoundDown(market.QuotePrecision) * quantity.RoundDown(market.AssetPrecision) < quote)
+      while (price.RoundDown(market.BaseAssetPrecision) * quantity.RoundDown(market.QuoteAssetPrecision) < quote)
         quantity *= 1.001m;
 
       IOrder order = await market.CreateLimitOrder(OrderSide.BUY, price, quantity);
@@ -147,12 +147,12 @@ namespace PiTrade.Strategy {
         foreach (var hit in hits)
           hit.BuyOrder = order;
       }
-      await order.WhenFilled(async o => {
+      await order.OnTrade(async o => {
         var commission = await CommissionManager.ManageCommission(o);
         await Sell(market, o, hits, commission);
       });
 
-      await order.WhenCanceled(o => {
+      await order.OnCancel(o => {
         lock (locker) ClearGrids(hits);
       });
     }
@@ -163,17 +163,17 @@ namespace PiTrade.Strategy {
       var price = AddSellThreshold(buyOrder.AvgFillPrice);
       var quantity = buyOrder.Quantity;
 
-      Log.Info($"[{market.Asset}{market.Quote}] SELL (price = {price})");
+      Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] SELL (price = {price})");
 
       // adjust quantity to be greater or equal the quotePerGrid
-      while (price.RoundDown(market.QuotePrecision) * quantity.RoundDown(market.AssetPrecision) < quote)
+      while (price.RoundDown(market.BaseAssetPrecision) * quantity.RoundDown(market.QuoteAssetPrecision) < quote)
         price *= 1.001m;
 
       IOrder order = await market.CreateLimitOrder(OrderSide.SELL, price, quantity);
       foreach (var hit in hits)
         hit.SellOrder = order;
 
-      await order.WhenFilled(async o => {
+      await order.OnTrade(async o => {
         var sellCommission = await CommissionManager.ManageCommission(o);
         lock (locker) {
           if (sellCommission.HasValue && buyCommission.HasValue) {
@@ -190,7 +190,7 @@ namespace PiTrade.Strategy {
         Log.Info($"SOLD [{o}] Profit = {Profit}");
       });
 
-      await order.WhenCanceled(o => ClearGrids(hits));
+      await order.OnCancel(o => ClearGrids(hits));
     }
 
     private void ClearGrids(IEnumerable<Grid> grids) {
@@ -206,7 +206,7 @@ namespace PiTrade.Strategy {
 
     private void PrintGrids() {
       foreach (var grid in grids)
-        Log.Info($"[{market.Asset}{market.Quote}] {grid}");
+        Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] {grid}");
     }
   }
 }

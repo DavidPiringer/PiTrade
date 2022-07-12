@@ -10,19 +10,25 @@ namespace PiTrade.Exchange {
 
     long Id { get; }
     IMarket Market { get; }
+    OrderType Type { get; }
     OrderSide Side { get; }
-    decimal TargetPrice { get; }
+    decimal Price { get; }
     decimal Quantity { get; }
     decimal Amount { get; }
     decimal ExecutedAmount { get; }
     decimal ExecutedQuantity { get; }
     decimal AvgFillPrice { get; }
+    IEnumerable<ITrade> Trades { get; }
     OrderState State { get; }
 
+
+    IOrder For(decimal price);
+    IOrder OnTrade(Action<IOrder, ITrade> fnc);
+    IOrder OnCancel(Action<IOrder> fnc);
+    IOrder OnError(Action<IOrder> action);
+
+    Task Transmit();
     Task Cancel();
-    Task WhenFilled(Action<IOrder> fnc);
-    Task WhenFilled(Func<IOrder, Task> fnc);
-    Task WhenCanceled(Action<IOrder> fnc);
-    Task WhenCanceled(Func<IOrder, Task> fnc);
+
   }
 }

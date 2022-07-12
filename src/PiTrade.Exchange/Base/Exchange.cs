@@ -57,7 +57,7 @@ namespace PiTrade.Exchange.Base {
       });
       
     private IMarket? SearchMarket(IEnumerable<IMarket> m, Symbol asset, Symbol quote) =>
-      m.Where(x => x.Asset == asset && x.Quote == quote).FirstOrDefault();
+      m.Where(x => x.QuoteAsset == asset && x.BaseAsset == quote).FirstOrDefault();
 
     private async Task StartMarketStreams(IMarket[] marketArr) {
       var step = (int)api.MaxMarketCountPerStream;
@@ -99,7 +99,7 @@ namespace PiTrade.Exchange.Base {
       foreach (var dto in dtos) {
         bool marketExists = false;
         foreach(var market in markets) {
-          if(market.Asset == dto.Asset && market.Quote == dto.Quote) {
+          if(market.QuoteAsset == dto.Asset && market.BaseAsset == dto.Quote) {
             marketExists = true;
             // update market
           }
