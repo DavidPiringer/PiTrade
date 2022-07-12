@@ -29,5 +29,7 @@ namespace PiTrade.Exchange.Base {
     public IOrder Sell(decimal quantity) => new Order(this, OrderSide.SELL, quantity);
 
     public IOrder Buy(decimal quantity) => new Order(this, OrderSide.BUY, quantity);
+
+    public override string ToString() => $"{QuoteAsset}{BaseAsset}";
   }
 }
