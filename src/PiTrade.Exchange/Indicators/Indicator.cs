@@ -28,7 +28,7 @@ namespace PiTrade.Exchange.Indicators {
       MaxTicks = maxTicks;
       Period = period;
 
-      market.Register2PriceChanges(OnPriceUpdate);
+      //market.Register2PriceChanges(OnPriceUpdate);
     }
 
     protected abstract decimal Calculate(decimal value);
