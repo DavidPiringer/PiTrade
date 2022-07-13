@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using PiTrade.Exchange.Base;
 using PiTrade.Exchange.Binance.Domain;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
@@ -12,16 +13,66 @@ using System.Text;
 using System.Web;
 
 namespace PiTrade.Exchange.Binance {
-  public sealed class BinanceExchange : IExchange {
+  public sealed class BinanceExchange : IExchange, IDisposable {
+    private readonly object locker = new object();
     private readonly BinanceHttpClient client;
     private readonly IDictionary<IMarket, ISet<Action<ITrade>>> tradeSubscriptions;
+    private CancellationTokenSource cancellationTokenSource;
 
-    public BinanceExchange(string key, string secret) {
+    private IEnumerable<IMarket> markets = Enumerable.Empty<IMarket>();
+    public IEnumerable<IMarket> Markets {
+      get { lock (locker) { return markets; } }
+      private set { lock (locker) { markets = value; } }
+    }
+
+    private BinanceExchange(string key, string secret) {
+      cancellationTokenSource = new CancellationTokenSource();
       client = new BinanceHttpClient(key, secret);
       tradeSubscriptions = new ConcurrentDictionary<IMarket, ISet<Action<ITrade>>>();
     }
 
+    public static async Task<BinanceExchange> Create(string key, string secret) {
+      var exchange = new BinanceExchange(key, secret);
+      await exchange.FetchMarkets();
+      exchange.SelfUpdateLoop();
+      return exchange;
+    }
 
+    private void SelfUpdateLoop() => Task.Run(async () => {
+      while (cancellationTokenSource.Token.IsCancellationRequested) {
+        await FetchMarkets();
+        await Task.Delay(TimeSpan.FromMinutes(1), cancellationTokenSource.Token);
+      }
+    }, cancellationTokenSource.Token);
+
+    private async Task FetchMarkets() {
+      var response = await client.Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
+      var markets = new List<IMarket>();
+      if (response != null) {
+        client.Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        var symbols = response.Symbols ?? Enumerable.Empty<SymbolInformation>();
+        foreach (var symbol in symbols) {
+          if (symbol.BaseAsset != null &&
+              symbol.QuoteAsset != null &&
+              symbol.Filters != null &&
+              symbol.MarketString != null) {
+
+            var baseAssetPrecision = symbol.QuoteAssetPrecision;
+            var quoteAssetPrecision = symbol.BaseAssetPrecision;
+
+            if (quoteAssetPrecision.HasValue && baseAssetPrecision.HasValue) {
+              var baseAsset = new Symbol(symbol.BaseAsset);
+              var quoteAsset = new Symbol(symbol.QuoteAsset);
+              markets.Add(new Market(this, baseAsset, quoteAsset, baseAssetPrecision.Value, quoteAssetPrecision.Value));
+            }
+          }
+        }
+      }
+      Markets = markets;
+    }
+
+    #region IExchange Members
     public async Task<bool> CancelOrder(IMarket market, long orderId) {
       var res = await client.SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
       { 
@@ -55,11 +106,7 @@ namespace PiTrade.Exchange.Binance {
       return response == null ? -1 : response.Id;
     }
 
-    public Task<IMarket[]> GetMarkets() {
-      throw new NotImplementedException();
-    }
-
-    private static string MarketString(IMarket market) => $"{market.QuoteAsset}{market.BaseAsset}".ToUpper();
+    private static string MarketString(IMarket market) => $"{market.BaseAsset}{market.QuoteAsset}".ToUpper();
 
     public void Subscribe(IMarket market, Action<ITrade> onTrade) {
       if(!tradeSubscriptions.ContainsKey(market))
@@ -71,5 +118,22 @@ namespace PiTrade.Exchange.Binance {
       if (tradeSubscriptions.ContainsKey(market))
         tradeSubscriptions[market].Remove(onTrade);
     }
+    #endregion
+    #region IDisposable Members
+    private bool disposedValue;
+    private void Dispose(bool disposing) {
+      if (!disposedValue) {
+        if (disposing)
+          cancellationTokenSource.Cancel();
+        disposedValue = true;
+      }
+    }
+
+    public void Dispose() {
+      // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+      Dispose(disposing: true);
+      GC.SuppressFinalize(this);
+    }
+    #endregion
   }
 }

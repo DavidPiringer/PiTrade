@@ -11,13 +11,17 @@ using PiTrade.Logging;
 
 namespace PiTrade.Exchange.Binance {
   internal class BinanceHttpClient {
-
+    private readonly object locker = new object();
     private const string BaseUri = "https://api.binance.com";
     private const string WSBaseUri = "wss://stream.binance.com:9443/ws";
     private readonly string secret;
     private readonly HttpClient client;
 
-    public long Ping { get; set; }
+    private long ping;
+    internal long Ping {
+      get { lock (locker) { return ping; } }
+      set { lock (locker) { ping = value; } }
+    }
 
     public BinanceHttpClient(string key, string secret) {
       this.secret = secret;
