@@ -12,18 +12,18 @@ namespace PiTrade.Exchange.Base {
   public sealed class Market : IMarket {
 
     public IExchange Exchange { get; }
-    public Symbol QuoteAsset { get; }
     public Symbol BaseAsset { get; }
-    public int QuoteAssetPrecision { get; }
+    public Symbol QuoteAsset { get; }
     public int BaseAssetPrecision { get; }
+    public int QuoteAssetPrecision { get; }
     public decimal CurrentPrice { get; private set; }
 
-    public Market(IExchange exchange, Symbol asset, Symbol quote, int assetPrecision, int quotePrecision) {
+    public Market(IExchange exchange, Symbol baseAsset, Symbol quoteAsset, int baseAssetPrecision, int quoteAssetPrecision) {
       Exchange = exchange;
-      QuoteAsset = asset;
-      BaseAsset = quote;
-      QuoteAssetPrecision = assetPrecision;
-      BaseAssetPrecision = quotePrecision;
+      BaseAsset = baseAsset;
+      QuoteAsset = quoteAsset;
+      BaseAssetPrecision = baseAssetPrecision;
+      QuoteAssetPrecision = quoteAssetPrecision;
     }
 
     public IOrder Sell(decimal quantity) => new Order(this, OrderSide.SELL, quantity);
@@ -33,6 +33,6 @@ namespace PiTrade.Exchange.Base {
     public void Subscribe(Action<ITrade> onTrade) => Exchange.Subscribe(this, onTrade);
     public void Unsubscribe(Action<ITrade> onTrade) => Exchange.Unsubscribe(this, onTrade);
 
-    public override string ToString() => $"{QuoteAsset}{BaseAsset}";
+    public override string ToString() => $"{BaseAsset}{QuoteAsset}";
   }
 }
