@@ -62,14 +62,15 @@ namespace PiTrade.Exchange.Base {
       return this;
     }
 
-    public Task Transmit() {
-      switch(Type) {
-        case OrderType.Market:
-          return Market.Exchange.CreateMarketOrder(Market, Side, Quantity, onTrade, onCancel, onError);
-        case OrderType.Limit:
-          return Market.Exchange.CreateLimitOrder(Market, Side, Quantity, Price, onTrade, onCancel, onError);
-        default: throw new NotImplementedException("Unknown order type");
-      }
+    public async Task Transmit() {
+      Market.Subscribe(OnTradeListener);
+      Id = Type switch {
+        OrderType.Market => await Market.Exchange.CreateMarketOrder(Market, Side, Quantity),
+        OrderType.Limit => await Market.Exchange.CreateLimitOrder(Market, Side, Quantity, Price),
+        _ => throw new NotImplementedException("Unknown order type")
+      };
+      if (Id == -1)
+        onError(this);
     }
 
     public async Task Cancel() {
@@ -95,6 +96,8 @@ namespace PiTrade.Exchange.Base {
       State = OrderState.Faulted;
       fnc?.Invoke(order);
     }
+
+    private void OnTradeListener(ITrade trade) => onTrade(this, trade);
 
     #region Disposable Support
     private bool disposedValue = false;

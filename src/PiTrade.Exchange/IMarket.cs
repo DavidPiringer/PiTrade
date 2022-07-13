@@ -20,6 +20,9 @@ namespace PiTrade.Exchange {
     IOrder Sell(decimal quantity);
     IOrder Buy(decimal quantity);
 
+    void Subscribe(Action<ITrade> onTrade);
+    void Unsubscribe(Action<ITrade> onTrade);
+
     //Task<IOrder> CreateMarketOrder(OrderSide side, decimal quantity);
     //Task<IOrder> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
 
