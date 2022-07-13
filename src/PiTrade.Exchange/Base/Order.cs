@@ -62,7 +62,7 @@ namespace PiTrade.Exchange.Base {
       return this;
     }
 
-    public async Task Transmit() {
+    public async Task<IOrder> Transmit() {
       Market.Subscribe(OnTradeListener);
       Id = Type switch {
         OrderType.Market => await Market.Exchange.CreateMarketOrder(Market, Side, Quantity),
@@ -71,6 +71,7 @@ namespace PiTrade.Exchange.Base {
       };
       if (Id == -1)
         onError(this);
+      return this;
     }
 
     public async Task Cancel() {
@@ -83,10 +84,12 @@ namespace PiTrade.Exchange.Base {
     }
 
     private void OnTradeWrapper(IOrder order, ITrade trade, Action<IOrder, ITrade>? fnc = null) {
-      trades.Add(trade);
-      if (trades.Sum(x => x.Quantity) >= Quantity)
-        State = OrderState.Filled;
-      fnc?.Invoke(order, trade);
+      if(trade.OIDSeller == Id || trade.OIDBuyer == Id) {
+        trades.Add(trade);
+        if (trades.Sum(x => x.Quantity) >= Quantity)
+          State = OrderState.Filled;
+        fnc?.Invoke(order, trade);
+      }
     }
 
     private void OnCancelWrapper(IOrder order, Action<IOrder>? fnc = null) {

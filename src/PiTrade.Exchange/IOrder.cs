@@ -27,7 +27,7 @@ namespace PiTrade.Exchange {
     IOrder OnCancel(Action<IOrder> fnc);
     IOrder OnError(Action<IOrder> action);
 
-    Task Transmit();
+    Task<IOrder> Transmit();
     Task Cancel();
 
   }
