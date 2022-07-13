@@ -75,8 +75,10 @@ namespace PiTrade.Exchange.Base {
 
     public async Task Cancel() {
       if(Id != -1 && State == OrderState.Open) {
+        Market.Unsubscribe(OnTradeListener);
         State = OrderState.Canceled;
         await Market.Exchange.CancelOrder(Market, Id);
+        onCancel(this);
       }
     }
 
@@ -99,17 +101,15 @@ namespace PiTrade.Exchange.Base {
 
     private void OnTradeListener(ITrade trade) => onTrade(this, trade);
 
-    #region Disposable Support
+    #region IDisposable Members
     private bool disposedValue = false;
     private void Dispose(bool disposing) {
       if (!disposedValue) {
-        Cancel().Wait();
+        if(disposing)
+          Cancel().Wait();
         disposedValue = true;
       }
     }
-
-    // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-    ~Order() => Dispose(disposing: false);
 
     public void Dispose() {
       // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
