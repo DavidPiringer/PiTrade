@@ -12,7 +12,7 @@ using PiTrade.Logging;
 namespace PiTrade.Exchange.Binance {
   internal class BinanceHttpClient {
 #if DEBUG
-    private const string BaseUri = "https://testnet.binance.vision/api";
+    private const string BaseUri = "https://testnet.binance.vision";
 #else
     private const string BaseUri = "https://api.binance.com";
 #endif
