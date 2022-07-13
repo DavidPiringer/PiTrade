@@ -1,4 +1,5 @@
 ﻿using PiTrade.Exchange.Enums;
+using PiTrade.Exchange.Extensions;
 
 namespace PiTrade.Exchange.Base {
   public sealed class Order : IOrder {
@@ -27,7 +28,11 @@ namespace PiTrade.Exchange.Base {
       Market = market;
       Type = OrderType.Market;
       Side = side;
-      Quantity = quantity;
+      Quantity = Side switch {
+        OrderSide.BUY => quantity.RoundUp(Market.BaseAssetPrecision),
+        OrderSide.SELL => quantity.RoundDown(Market.BaseAssetPrecision),
+        _ => throw new NotImplementedException()
+      };
       onTrade = (o, t) => OnTradeWrapper(o, t);
       onCancel = (o) => OnCancelWrapper(o);
       onError = (o) => OnErrorWrapper(o);
@@ -44,7 +49,11 @@ namespace PiTrade.Exchange.Base {
 
     public IOrder For(decimal price) {
       Type = OrderType.Limit;
-      Price = price;
+      Price = Side switch {
+        OrderSide.BUY => price.RoundDown(Market.QuoteAssetPrecision),
+        OrderSide.SELL => price.RoundUp(Market.QuoteAssetPrecision),
+        _ => throw new NotImplementedException()
+      };
       return this;
     }
 
