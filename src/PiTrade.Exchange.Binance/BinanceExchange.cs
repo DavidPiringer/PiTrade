@@ -6,6 +6,7 @@ using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Logging;
+using PiTrade.Networking;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -14,10 +15,16 @@ using System.Web;
 
 namespace PiTrade.Exchange.Binance {
   public sealed class BinanceExchange : IExchange, IDisposable {
+#if DEBUG
+    private const string WSBaseUri = "wss://testnet.binance.vision/ws";
+#else
+    private const string WSBaseUri = "wss://stream.binance.com:9443/ws";
+#endif
     private readonly object locker = new object();
     private readonly BinanceHttpClient client;
     private readonly IDictionary<IMarket, ISet<Action<ITrade>>> tradeSubscriptions;
     private CancellationTokenSource cancellationTokenSource;
+    private IList<WebSocket> sockets = new List<WebSocket>();
 
     private IEnumerable<IMarket> markets = Enumerable.Empty<IMarket>();
     public IEnumerable<IMarket> Markets {
@@ -72,7 +79,7 @@ namespace PiTrade.Exchange.Binance {
       Markets = markets;
     }
 
-    #region IExchange Members
+#region IExchange Members
     public async Task<bool> CancelOrder(IMarket market, long orderId) {
       var res = await client.SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
       { 
@@ -109,8 +116,11 @@ namespace PiTrade.Exchange.Binance {
     private static string MarketString(IMarket market) => $"{market.BaseAsset}{market.QuoteAsset}".ToUpper();
 
     public void Subscribe(IMarket market, Action<ITrade> onTrade) {
-      if(!tradeSubscriptions.ContainsKey(market))
-        tradeSubscriptions.Add(market, new HashSet<Action<ITrade>>());
+      if (!tradeSubscriptions.ContainsKey(market)) { 
+        var hs = new HashSet<Action<ITrade>>();
+        tradeSubscriptions.Add(market, hs);
+        StartMarketWS(market, hs);
+      }
       tradeSubscriptions[market].Add(onTrade);
     }
 
@@ -118,13 +128,32 @@ namespace PiTrade.Exchange.Binance {
       if (tradeSubscriptions.ContainsKey(market))
         tradeSubscriptions[market].Remove(onTrade);
     }
-    #endregion
-    #region IDisposable Members
+
+#endregion
+
+    private void StartMarketWS(IMarket market, IEnumerable<Action<ITrade>> subs) {
+      WebSocket socket = new WebSocket(new Uri($"{WSBaseUri}/{MarketString(market).ToLower()}@trade"));
+      socket.OnMessage(msg => ProcessTradeMessage(msg, subs));
+      sockets.Add(socket);
+    }
+
+    private void ProcessTradeMessage(string msg, IEnumerable<Action<ITrade>> subs) {
+      var trade = JsonConvert.DeserializeObject<BinanceSpotTrade>(msg);
+      if (trade == null) return;
+
+      foreach (var sub in subs)
+        sub(trade);
+    }
+
+#region IDisposable Members
     private bool disposedValue;
     private void Dispose(bool disposing) {
       if (!disposedValue) {
-        if (disposing)
+        if (disposing) {
           cancellationTokenSource.Cancel();
+          foreach(var ws in sockets)
+            ws.Disconnect().Wait();
+        }
         disposedValue = true;
       }
     }
@@ -134,6 +163,6 @@ namespace PiTrade.Exchange.Binance {
       Dispose(disposing: true);
       GC.SuppressFinalize(this);
     }
-    #endregion
+#endregion
   }
 }
