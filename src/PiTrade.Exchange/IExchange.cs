@@ -8,7 +8,7 @@ using PiTrade.Exchange.Enums;
 
 namespace PiTrade.Exchange {
   public interface IExchange {
-    Task<IMarket[]> GetMarkets();
+    IEnumerable<IMarket> Markets { get; }
 
     Task<long> CreateMarketOrder(
       IMarket market, OrderSide side, decimal quantity);
