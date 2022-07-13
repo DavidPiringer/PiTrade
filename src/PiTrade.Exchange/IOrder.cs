@@ -15,9 +15,9 @@ namespace PiTrade.Exchange {
     decimal Price { get; }
     decimal Quantity { get; }
     decimal Amount { get; }
-    decimal ExecutedAmount { get; }
+    decimal ExecutedPrice { get; }
     decimal ExecutedQuantity { get; }
-    decimal AvgFillPrice { get; }
+    decimal ExecutedAmount { get; }
     IEnumerable<ITrade> Trades { get; }
     OrderState State { get; }
 

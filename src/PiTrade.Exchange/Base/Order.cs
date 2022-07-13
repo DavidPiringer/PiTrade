@@ -1,4 +1,5 @@
-﻿using PiTrade.Exchange.Enums;
+﻿using System.Linq;
+using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 
 namespace PiTrade.Exchange.Base {
@@ -12,9 +13,9 @@ namespace PiTrade.Exchange.Base {
     public decimal Price { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal Amount => Quantity * Price;
-    public decimal ExecutedAmount => ExecutedQuantity * AvgFillPrice;
-    public decimal ExecutedQuantity { get; private set; }
-    public decimal AvgFillPrice { get; private set; }
+    public decimal ExecutedPrice => Trades.Average(x => x.Price);
+    public decimal ExecutedQuantity => Trades.Sum(x => x.Quantity);
+    public decimal ExecutedAmount => ExecutedQuantity * ExecutedPrice;
     public OrderState State { get; private set; }
     public IEnumerable<ITrade> Trades => trades.ToArray();
 
@@ -40,10 +41,11 @@ namespace PiTrade.Exchange.Base {
 
 
     public override string ToString() =>
-      //$"Id = {Id}, " +
+      $"Id = {Id}, " +
       $"Market = {Market}, " +
       $"Side = {Side}, " +
-      $"Price = {Price}({AvgFillPrice}), " +
+      $"Type = {Type}, " +
+      $"Price = {Price}({ExecutedPrice}), " +
       $"Quantity = {ExecutedQuantity}/{Quantity}";
 
 
@@ -73,13 +75,16 @@ namespace PiTrade.Exchange.Base {
 
     public async Task<IOrder> Transmit() {
       Market.Subscribe(OnTradeListener);
-      Id = Type switch {
+      var res = Type switch {
         OrderType.Market => await Market.Exchange.CreateMarketOrder(Market, Side, Quantity),
         OrderType.Limit => await Market.Exchange.CreateLimitOrder(Market, Side, Quantity, Price),
         _ => throw new NotImplementedException("Unknown order type")
       };
+      Id = res.OrderId;
       if (Id == -1)
         onError(this);
+      foreach (var trade in res.MatchedOrders)
+        onTrade(this, trade);
       return this;
     }
 
