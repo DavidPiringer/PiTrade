@@ -3,7 +3,7 @@ using PiTrade.Exchange.Entities;
 
 namespace PiTrade.Exchange.Binance.Domain {
   [JsonObject(MemberSerialization.OptIn)]
-  internal class TradeStreamUpdate : ITradeUpdate {
+  internal class BinanceSpotTrade : ITrade {
     [JsonProperty(PropertyName = "s")]
     public string? Symbol { get; set; }
 
@@ -20,11 +20,7 @@ namespace PiTrade.Exchange.Binance.Domain {
     public long OIDSeller { get; set; }
 
     [JsonIgnore]
-    public Symbol Asset { get; set; } = new Symbol("None");
+    public decimal Commission { get; set; }
 
-    [JsonIgnore]
-    public Symbol Quote { get; set; } = new Symbol("None");
-
-    public bool Match(long id) => id == OIDSeller || id == OIDBuyer;
   }
 }

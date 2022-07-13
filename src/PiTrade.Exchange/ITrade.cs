@@ -8,6 +8,8 @@ namespace PiTrade.Exchange {
   public interface ITrade {
     decimal Price { get; set; }
     decimal Quantity { get; set; }
+    public long OIDBuyer { get; set; }
+    public long OIDSeller { get; set; }
     decimal Commission { get; set; }
   }
 }
