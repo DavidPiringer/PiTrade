@@ -89,7 +89,7 @@ namespace PiTrade.Exchange.Binance {
       return res != null;
     }
 
-    public async Task<long> CreateLimitOrder(IMarket market, OrderSide side, decimal quantity, decimal price) {
+    public async Task<OrderCreationResult> CreateLimitOrder(IMarket market, OrderSide side, decimal quantity, decimal price) {
       var response = await client.SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -99,10 +99,10 @@ namespace PiTrade.Exchange.Binance {
         {"quantity", quantity},
         {"price", price}
       });
-      return response == null ? -1 : response.Id;
+      return CreateOrderCreationResult(response);
     }
 
-    public async Task<long> CreateMarketOrder(IMarket market, OrderSide side, decimal quantity) {
+    public async Task<OrderCreationResult> CreateMarketOrder(IMarket market, OrderSide side, decimal quantity) {
       var response = await client.SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
@@ -110,7 +110,7 @@ namespace PiTrade.Exchange.Binance {
         {"type", "MARKET"},
         {"quantity", quantity}
       });
-      return response == null ? -1 : response.Id;
+      return CreateOrderCreationResult(response);
     }
 
     private static string MarketString(IMarket market) => $"{market.BaseAsset}{market.QuoteAsset}".ToUpper();
@@ -140,12 +140,22 @@ namespace PiTrade.Exchange.Binance {
     private void ProcessTradeMessage(string msg, IEnumerable<Action<ITrade>> subs) {
       var trade = JsonConvert.DeserializeObject<BinanceSpotTrade>(msg);
       if (trade == null) return;
+      DelegateTrade(trade, subs);
+    }
 
+    private void DelegateTrade(ITrade trade, IEnumerable<Action<ITrade>> subs) {
       foreach (var sub in subs)
         sub(trade);
     }
 
-#region IDisposable Members
+    private OrderCreationResult CreateOrderCreationResult(BinanceOrder? order) =>
+      new OrderCreationResult() {
+        OrderId = order?.Id ?? -1,
+        MatchedOrders = order?.Fills?.Select(x => x.ToSpotTrade()) ??
+          Enumerable.Empty<BinanceSpotTrade>()
+      };
+
+    #region IDisposable Members
     private bool disposedValue;
     private void Dispose(bool disposing) {
       if (!disposedValue) {

@@ -7,13 +7,18 @@ using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
 
 namespace PiTrade.Exchange {
+  public struct OrderCreationResult {
+    public long OrderId { get; set; }
+    public IEnumerable<ITrade> MatchedOrders { get; set; }
+  }
+
   public interface IExchange {
     IEnumerable<IMarket> Markets { get; }
 
-    Task<long> CreateMarketOrder(
+    Task<OrderCreationResult> CreateMarketOrder(
       IMarket market, OrderSide side, decimal quantity);
 
-    Task<long> CreateLimitOrder(
+    Task<OrderCreationResult> CreateLimitOrder(
       IMarket market, OrderSide side, decimal quantity, decimal price);
 
     Task<bool> CancelOrder(IMarket market, long orderId);

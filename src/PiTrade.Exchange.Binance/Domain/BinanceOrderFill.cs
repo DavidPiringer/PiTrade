@@ -13,5 +13,10 @@ namespace PiTrade.Exchange.Binance.Domain {
 
     [JsonProperty(PropertyName = "qty")]
     public decimal Quantity { get; set; }
+
+    public BinanceSpotTrade ToSpotTrade() => new BinanceSpotTrade() {
+      Price = Price,
+      Quantity = Quantity
+    };
   }
 }
