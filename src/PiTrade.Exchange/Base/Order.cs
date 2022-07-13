@@ -20,6 +20,7 @@ namespace PiTrade.Exchange.Base {
     public IEnumerable<ITrade> Trades => trades.ToArray();
 
 
+    private Action<IOrder> onExecuted;
     private Action<IOrder, ITrade> onTrade;
     private Action<IOrder> onCancel;
     private Action<IOrder> onError;
@@ -34,6 +35,7 @@ namespace PiTrade.Exchange.Base {
         OrderSide.SELL => quantity.RoundDown(Market.BaseAssetPrecision),
         _ => throw new NotImplementedException()
       };
+      onExecuted = (o) => OnExecutedWrapper(o);
       onTrade = (o, t) => OnTradeWrapper(o, t);
       onCancel = (o) => OnCancelWrapper(o);
       onError = (o) => OnErrorWrapper(o);
@@ -56,6 +58,12 @@ namespace PiTrade.Exchange.Base {
         OrderSide.SELL => price.RoundUp(Market.QuoteAssetPrecision),
         _ => throw new NotImplementedException()
       };
+      return this;
+    }
+
+
+    public IOrder OnExecuted(Action<IOrder> fnc) {
+      onExecuted = (o) => OnExecutedWrapper(o, fnc);
       return this;
     }
 
@@ -97,11 +105,16 @@ namespace PiTrade.Exchange.Base {
       }
     }
 
+    private void OnExecutedWrapper(IOrder order, Action<IOrder>? fnc = null) {
+      Market.Unsubscribe(OnTradeListener);
+      State = OrderState.Filled;
+      fnc?.Invoke(order);
+    }
     private void OnTradeWrapper(IOrder order, ITrade trade, Action<IOrder, ITrade>? fnc = null) {
       if(trade.OIDSeller == Id || trade.OIDBuyer == Id) {
         trades.Add(trade);
         if (trades.Sum(x => x.Quantity) >= Quantity)
-          State = OrderState.Filled;
+          onExecuted(order);
         fnc?.Invoke(order, trade);
       }
     }

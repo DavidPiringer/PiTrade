@@ -23,6 +23,7 @@ namespace PiTrade.Exchange {
 
 
     IOrder For(decimal price);
+    IOrder OnExecuted(Action<IOrder> fnc);
     IOrder OnTrade(Action<IOrder, ITrade> fnc);
     IOrder OnCancel(Action<IOrder> fnc);
     IOrder OnError(Action<IOrder> action);
