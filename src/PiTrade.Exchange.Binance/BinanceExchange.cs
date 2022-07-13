@@ -39,7 +39,7 @@ namespace PiTrade.Exchange.Binance {
     }
 
     private void SelfUpdateLoop() => Task.Run(async () => {
-      while (cancellationTokenSource.Token.IsCancellationRequested) {
+      while (!cancellationTokenSource.Token.IsCancellationRequested) {
         await FetchMarkets();
         await Task.Delay(TimeSpan.FromMinutes(1), cancellationTokenSource.Token);
       }
