@@ -148,12 +148,18 @@ namespace PiTrade.Exchange.Binance {
         sub(trade);
     }
 
-    private OrderCreationResult CreateOrderCreationResult(BinanceOrder? order) =>
-      new OrderCreationResult() {
-        OrderId = order?.Id ?? -1,
-        MatchedOrders = order?.Fills?.Select(x => x.ToSpotTrade()) ??
-          Enumerable.Empty<BinanceSpotTrade>()
+    private OrderCreationResult CreateOrderCreationResult(BinanceOrder? order) {
+      var oid = order?.Id ?? -1;
+      var matches = (order?.Fills?.Select(x => x.ToSpotTrade()) ?? Enumerable.Empty<BinanceSpotTrade>()).ToArray();
+      foreach(var match in matches)
+        match.OIDBuyer = oid;
+
+      return new OrderCreationResult() {
+        OrderId = oid,
+        MatchedOrders = matches
       };
+    }
+      
 
     #region IDisposable Members
     private bool disposedValue;
