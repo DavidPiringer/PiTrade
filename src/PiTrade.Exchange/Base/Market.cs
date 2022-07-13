@@ -30,6 +30,9 @@ namespace PiTrade.Exchange.Base {
 
     public IOrder Buy(decimal quantity) => new Order(this, OrderSide.BUY, quantity);
 
+    public void Subscribe(Action<ITrade> onTrade) => Exchange.Subscribe(this, onTrade);
+    public void Unsubscribe(Action<ITrade> onTrade) => Exchange.Unsubscribe(this, onTrade);
+
     public override string ToString() => $"{QuoteAsset}{BaseAsset}";
   }
 }
