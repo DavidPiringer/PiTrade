@@ -37,9 +37,9 @@ var order2 = await btcbusd
   .OnTrade((o, t) => {
     global::System.Console.WriteLine(o);
   })
-  .OnExecuted(o => {
+  .OnExecutedAsync(o => Task.Run(() => {
     global::System.Console.WriteLine($"Executed {o.Id}");
-  })
+  }))
   .Submit();
 
 Console.ReadLine();
