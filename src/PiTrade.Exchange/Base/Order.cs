@@ -10,13 +10,13 @@ namespace PiTrade.Exchange.Base {
     public IMarket Market { get; private set; }
     public OrderType Type { get; private set; }
     public OrderSide Side { get; private set; }
+    public OrderState State { get; private set; }
     public decimal Price { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal Amount => Quantity * Price;
     public decimal ExecutedPrice => Trades.Average(x => x.Price);
     public decimal ExecutedQuantity => Trades.Sum(x => x.Quantity);
     public decimal ExecutedAmount => ExecutedQuantity * ExecutedPrice;
-    public OrderState State { get; private set; }
     public IEnumerable<ITrade> Trades => trades.ToArray();
 
 
@@ -81,7 +81,7 @@ namespace PiTrade.Exchange.Base {
       return this;
     }
 
-    public async Task<IOrder> Transmit() {
+    public async Task<IOrder> Submit() {
       Market.Subscribe(OnTradeListener);
       var res = Type switch {
         OrderType.Market => await Market.Exchange.CreateMarketOrder(Market, Side, Quantity),
