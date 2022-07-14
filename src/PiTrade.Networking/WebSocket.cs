@@ -3,90 +3,109 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using PiTrade.Logging;
 
 namespace PiTrade.Networking {
-  public class WebSocket<T> where T : class {
+  public class WebSocket {
     private static readonly int receiveBufferSize = 8192;
     private readonly Uri uri;
-    private readonly Func<string, T?> transformFnc;
 
-    private ClientWebSocket? Socket { get; set; }
-    private CancellationTokenSource? CTS { get; set; }
+    private ClientWebSocket socket;
+    private CancellationTokenSource cancellationTokenSource;
 
-    public WebSocket(Uri uri) : this(uri, s => JsonConvert.DeserializeObject<T>(s)) { }
-    public WebSocket(Uri connectionUri, Func<string, T?> transformFnc) { 
+    private Action<WebSocket> onConnect;
+    private Action<string> onMessage;
+    private Action<Exception> onError;
+    private Action<WebSocket> onDisconnect;
+
+    public WebSocket(Uri connectionUri) { 
       uri = connectionUri;
-      this.transformFnc = transformFnc;
+      socket = new ClientWebSocket();
+      cancellationTokenSource = new CancellationTokenSource();
+      onConnect = (ws) => { };
+      onMessage = (s) => { };
+      onError = (e) => { };
+      onDisconnect = (ws) => { };
     }
 
+    public WebSocket OnConnect(Action<WebSocket> fnc) {
+      onConnect = fnc;
+      return this;
+    }
 
-    public async Task<(T? message, bool success)> NextMessage() {
-      try {
-        if (Socket == null || CTS == null || Socket.State != WebSocketState.Open)
-          await Connect();
+    public WebSocket OnMessage(Action<string> fnc) {
+      onMessage = fnc;
+      return this;
+    }
 
-        var buffer = new byte[receiveBufferSize];
-        using MemoryStream outputStream = new(receiveBufferSize);
-        WebSocketReceiveResult receiveResult;
-        if (Socket != null && CTS != null) do {
-          receiveResult = await Socket.ReceiveAsync(buffer, CTS.Token);
-          if (receiveResult.MessageType != WebSocketMessageType.Close)
-            outputStream.Write(buffer, 0, receiveResult.Count);
-        } while (!receiveResult.EndOfMessage);
-        outputStream.Position = 0;
-        using StreamReader reader = new(outputStream);
-        return (transformFnc(reader.ReadToEnd()), true);
-      } catch (Exception ex) {
-        Log.Error($"{ex.GetType().Name} - {ex.Message}");
-        return (default(T), false);
-      }
+    public WebSocket OnError(Action<Exception> fnc) {
+      onError = fnc;
+      return this;
+    }
+
+    public WebSocket OnDisconnect(Action<WebSocket> fnc) {
+      onDisconnect = fnc;
+      return this;
     }
 
     public async Task SendMessage(string message) {
       try {
-        if (Socket == null || CTS == null || Socket.State != WebSocketState.Open)
-          await Connect();
-
-        if (Socket != null && CTS != null) {
+        if (socket != null && cancellationTokenSource != null) {
           byte[] sendBytes = Encoding.UTF8.GetBytes(message);
           var sendBuffer = new ArraySegment<byte>(sendBytes);
-          await Socket.SendAsync(sendBuffer, WebSocketMessageType.Text, true, CTS.Token);
+          await socket.SendAsync(sendBuffer, WebSocketMessageType.Text, true, cancellationTokenSource.Token);
         }
       } catch (Exception ex) {
-        Log.Error($"{ex.GetType().Name} - {ex.Message}");
+        onError(ex);
       }
     }
 
-    private async Task Connect() {
-      Socket = new ClientWebSocket();
-      CTS = new CancellationTokenSource();
-      await Socket.ConnectAsync(uri, CTS.Token);
-    }
-
-    private async Task Disconnect() {
-      if(Socket != null) {
-        if (Socket.State == WebSocketState.Open && CTS != null) {
-          CTS.CancelAfter(TimeSpan.FromSeconds(2));
-          await Socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
-        }
-        Socket.Dispose();
-        Socket = null;
-      }
-      if(CTS != null) {
-        CTS.Dispose();
-        CTS = null;
+    public async Task Connect() {
+      if (socket.State == WebSocketState.None) {
+        await socket.ConnectAsync(uri, cancellationTokenSource.Token);
+        onConnect(this);
+        MessageLoop();
       }
     }
 
-    #region Dispose
+    public async Task Disconnect() {
+      if (socket.State == WebSocketState.Open) {
+        onDisconnect(this);
+        cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(2));
+        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+      }
+    }
+
+    private void MessageLoop() => Task.Run(async () => {
+      while (!cancellationTokenSource.IsCancellationRequested)
+        await NextMessage();
+    });
+
+    private async Task NextMessage() {
+      try {
+        var buffer = new byte[receiveBufferSize];
+        using MemoryStream outputStream = new(receiveBufferSize);
+        WebSocketReceiveResult receiveResult;
+        if (socket != null && cancellationTokenSource != null) do {
+            receiveResult = await socket.ReceiveAsync(buffer, cancellationTokenSource.Token);
+            if (receiveResult.MessageType != WebSocketMessageType.Close)
+              outputStream.Write(buffer, 0, receiveResult.Count);
+          } while (!receiveResult.EndOfMessage);
+        outputStream.Position = 0;
+        using StreamReader reader = new(outputStream);
+        onMessage(reader.ReadToEnd());
+      } catch (Exception ex) {
+        onError(ex);
+      }
+    }
+
+    #region IDisposable Members
     private bool disposedValue;
     protected virtual void Dispose(bool disposing) {
       if (!disposedValue) {
         if (disposing) {
           Disconnect().Wait();
+          socket.Dispose();
+          cancellationTokenSource.Dispose();
         }
         disposedValue = true;
       }

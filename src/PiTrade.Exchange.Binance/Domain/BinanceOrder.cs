@@ -23,6 +23,7 @@ namespace PiTrade.Exchange.Binance.Domain {
     [JsonProperty(PropertyName = "cummulativeQuoteQty")]
     public decimal CummulativeQuoteQty { get; set; }
 
-
+    [JsonProperty(PropertyName = "fills")]
+    public IEnumerable<BinanceOrderFill>? Fills { get; set; }
   }
 }

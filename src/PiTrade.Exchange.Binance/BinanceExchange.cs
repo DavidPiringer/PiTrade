@@ -1,10 +1,12 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using PiTrade.Exchange.Base;
 using PiTrade.Exchange.Binance.Domain;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Logging;
+using PiTrade.Networking;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -12,94 +14,83 @@ using System.Text;
 using System.Web;
 
 namespace PiTrade.Exchange.Binance {
-  /*
-  public sealed class BinanceExchange : Exchange {
-    private const string BaseUri = "https://api.binance.com";
-    private readonly TimeSpan UpdateInterval = TimeSpan.FromMinutes(5);
-    private readonly string secret;
-    private readonly HttpClient client;
+  public sealed class BinanceExchange : IExchange, IDisposable {
+#if DEBUG
+    private const string WSBaseUri = "wss://testnet.binance.vision/ws";
+#else
+    private const string WSBaseUri = "wss://stream.binance.com:9443/ws";
+#endif
     private readonly object locker = new object();
-    private readonly IList<string> containedMarkets = new List<string>();
+    private readonly BinanceHttpClient client;
+    private readonly IDictionary<IMarket, ISet<Action<ITrade>>> tradeSubscriptions;
+    private CancellationTokenSource cancellationTokenSource;
+    private IList<WebSocket> sockets = new List<WebSocket>();
 
-    private long ping;
-    private long Ping {
-      get { lock (locker) { return ping; } }
-      set { lock (locker) { ping = value; } }
+    private IEnumerable<IMarket> markets = Enumerable.Empty<IMarket>();
+    public IEnumerable<IMarket> Markets {
+      get { lock (locker) { return markets; } }
+      private set { lock (locker) { markets = value; } }
     }
 
-    private DateTime lastUpdate = DateTime.MinValue;
-
-
-    public BinanceExchange(string key, string secret) {
-      this.secret = secret;
-      client = new HttpClient();
-      client.BaseAddress = new Uri(BaseUri);
-      client.Timeout = TimeSpan.FromSeconds(10);
-      client.DefaultRequestHeaders.Add("X-MBX-APIKEY", key);
-      Update(CancellationToken.None).Wait();
+    private BinanceExchange(string key, string secret) {
+      cancellationTokenSource = new CancellationTokenSource();
+      client = new BinanceHttpClient(key, secret);
+      tradeSubscriptions = new ConcurrentDictionary<IMarket, ISet<Action<ITrade>>>();
     }
 
-    public async Task<IReadOnlyDictionary<Symbol, decimal>> GetFunds() {
-      var response = await SendSigned<AccountInformation>("/api/v3/account", HttpMethod.Get);
-      if (response == null) return new Dictionary<Symbol, decimal>();
-
-      Dictionary<Symbol, decimal> funds = new Dictionary<Symbol, decimal>();
-      foreach (var balance in response.Balances ?? Enumerable.Empty<AccountBalanceInformation>())
-        if (balance.Asset != null)
-          funds.Add(new Symbol(balance.Asset), balance.Free);
-
-      return funds;
+    public static async Task<BinanceExchange> Create(string key, string secret) {
+      var exchange = new BinanceExchange(key, secret);
+      await exchange.FetchMarkets();
+      exchange.SelfUpdateLoop();
+      return exchange;
     }
 
-    protected override async Task Update(CancellationToken cancellationToken) {
-      if(lastUpdate.Add(UpdateInterval) < DateTime.Now) {
-        lastUpdate = DateTime.Now;
-        var response = await Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
+    private void SelfUpdateLoop() => Task.Run(async () => {
+      while (!cancellationTokenSource.Token.IsCancellationRequested) {
+        await FetchMarkets();
+        await Task.Delay(TimeSpan.FromMinutes(1), cancellationTokenSource.Token);
+      }
+    }, cancellationTokenSource.Token);
 
-        if (response != null) {
-          Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    private async Task FetchMarkets() {
+      var response = await client.Send<ExchangeInformation>("/api/v3/exchangeInfo", HttpMethod.Get);
+      var markets = new List<IMarket>();
+      if (response != null) {
+        client.Ping = response.ServerTime - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-          var symbols = response.Symbols ?? Enumerable.Empty<SymbolInformation>();
-          foreach (var symbol in symbols) {
-            if (!cancellationToken.IsCancellationRequested &&
-                symbol.BaseAsset != null &&
-                symbol.QuoteAsset != null &&
-                symbol.Filters != null &&
-                symbol.IsSpotTradingAllowed.HasValue &&
-                symbol.IsSpotTradingAllowed.Value &&
-                symbol.MarketString != null &&
-                !containedMarkets.Contains(symbol.MarketString)) {
+        var symbols = response.Symbols ?? Enumerable.Empty<SymbolInformation>();
+        foreach (var symbol in symbols) {
+          if (symbol.BaseAsset != null &&
+              symbol.QuoteAsset != null &&
+              symbol.Filters != null &&
+              symbol.MarketString != null) {
 
-              var assetPrecision = symbol.AssetPrecision;
-              var quotePrecision = symbol.QuotePrecision;
+            var baseAssetPrecision = symbol.QuoteAssetPrecision;
+            var quoteAssetPrecision = symbol.BaseAssetPrecision;
 
-              if (assetPrecision.HasValue && quotePrecision.HasValue) {
-                containedMarkets.Add(symbol.MarketString);
-                RegisterMarket(new BinanceMarket(this, new Symbol(symbol.BaseAsset), new Symbol(symbol.QuoteAsset),
-                                                 assetPrecision.Value, quotePrecision.Value));
-              }
+            if (quoteAssetPrecision.HasValue && baseAssetPrecision.HasValue) {
+              var baseAsset = new Symbol(symbol.BaseAsset);
+              var quoteAsset = new Symbol(symbol.QuoteAsset);
+              markets.Add(new Market(this, baseAsset, quoteAsset, baseAssetPrecision.Value, quoteAssetPrecision.Value));
             }
           }
         }
       }
+      Markets = markets;
     }
 
-    #region Internal Methods
-    internal async Task<(long? orderId, ErrorState error)> NewMarketOrder(Market market, OrderSide side, decimal quantity) {
-      var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
-      {
+#region IExchange Members
+    public async Task<bool> CancelOrder(IMarket market, long orderId) {
+      var res = await client.SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
+      { 
         {"symbol", MarketString(market) },
-        {"side", side.ToString()},
-        {"type", "MARKET"},
-        {"quantity", quantity}
+        {"orderId", orderId.ToString()} 
       });
-      if (response == null || response.Id == -1)
-        return (null, ErrorState.IdNotFound);
-      return (response.Id, ErrorState.None);
+      return res != null;
     }
 
-    internal async Task<(long? orderId, ErrorState error)> NewLimitOrder(Market market, OrderSide side, decimal price, decimal quantity) {
-      var response = await SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
+    public async Task<OrderCreationResult> CreateLimitOrder(IMarket market, OrderSide side, decimal quantity, decimal price) {
+      var response = await client.SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },
         {"side", side.ToString()},
@@ -108,106 +99,86 @@ namespace PiTrade.Exchange.Binance {
         {"quantity", quantity},
         {"price", price}
       });
-      if (response == null || response.Id == -1)
-        return (null, ErrorState.IdNotFound);
-      return (response.Id, ErrorState.None);
+      return CreateOrderCreationResult(response);
     }
 
-
-    internal async Task<ErrorState> Cancel(Order order) {
-      if(!order.Id.HasValue) return ErrorState.None;
-
-      return await SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
-        { {"symbol", MarketString(order.Market) },
-        {"orderId", order.Id.ToString()} }) == null ?
-      ErrorState.IdNotFound : ErrorState.None;
+    public async Task<OrderCreationResult> CreateMarketOrder(IMarket market, OrderSide side, decimal quantity) {
+      var response = await client.SendSigned<BinanceOrder>("/api/v3/order", HttpMethod.Post, new Dictionary<string, object>()
+      {
+        {"symbol", MarketString(market) },
+        {"side", side.ToString()},
+        {"type", "MARKET"},
+        {"quantity", quantity}
+      });
+      return CreateOrderCreationResult(response);
     }
 
+    private static string MarketString(IMarket market) => $"{market.BaseAsset}{market.QuoteAsset}".ToUpper();
 
-    internal Task CancelAll(IMarket market) =>
-      SendSigned("/api/v3/openOrders", HttpMethod.Delete, new Dictionary<string, object>()
-        { {"symbol", MarketString(market)} });
-
-    #endregion
-
-    public override string ToString() => "Binance";
-
-    #region Helper
-    private static string MarketString(IMarket market) => $"{market.Asset}{market.Quote}".ToUpper();
-    #endregion
-
-    #region Http Client Abstraction
-
-    private Task<EmptyJsonResponse?> Send(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
-      Send<EmptyJsonResponse>(requestUri, method, query, content);
-
-    private async Task<T?> Send<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
-      if (query == null)
-        query = new Dictionary<string, object>();
-
-      var queryString = PrepareQueryString(query, false);
-      return await SendRequest<T>($"{requestUri}?{queryString}", method, content);
+    public void Subscribe(IMarket market, Action<ITrade> onTrade) {
+      if (!tradeSubscriptions.ContainsKey(market)) { 
+        var hs = new HashSet<Action<ITrade>>();
+        tradeSubscriptions.Add(market, hs);
+        StartMarketWS(market, hs);
+      }
+      tradeSubscriptions[market].Add(onTrade);
     }
 
-    private Task<EmptyJsonResponse?> SendSigned(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) =>
-      SendSigned<EmptyJsonResponse>(requestUri, method, query, content);
-
-    private async Task<T?> SendSigned<T>(string requestUri, HttpMethod method, IDictionary<string, object>? query = null, object? content = null) {
-      if (query == null)
-        query = new Dictionary<string, object>();
-
-      var queryString = PrepareQueryString(query);
-      return await SendRequest<T>($"{requestUri}?{queryString}", method, content);
+    public void Unsubscribe(IMarket market, Action<ITrade> onTrade) {
+      if (tradeSubscriptions.ContainsKey(market))
+        tradeSubscriptions[market].Remove(onTrade);
     }
 
-    private async Task<T?> SendRequest<T>(string requestUri, HttpMethod method, object? content) {
-      using (var request = new HttpRequestMessage(method, $"{BaseUri}{requestUri}")) {
-        if (content != null)
-          request.Content = new StringContent(
-            JsonConvert.SerializeObject(content),
-            Encoding.UTF8, "application/json");
+#endregion
 
-        try {
-          var response = await client.SendAsync(request);
-          var json = await response.Content.ReadAsStringAsync();
-          if (!response.IsSuccessStatusCode) {
-            Log.Error(requestUri);
-            Log.Error(response);
-            Log.Error(json);
-            // TODO: deserialize in binance error response
-          }
-          return typeof(T) != typeof(EmptyJsonResponse) ?
-                 JsonConvert.DeserializeObject<T>(json) : default(T);
-        } catch (Exception e) {
-          Log.Error(e.Message);
+    private void StartMarketWS(IMarket market, IEnumerable<Action<ITrade>> subs) {
+      WebSocket socket = new WebSocket(new Uri($"{WSBaseUri}/{MarketString(market).ToLower()}@trade"));
+      socket.OnMessage(msg => ProcessTradeMessage(msg, subs));
+      sockets.Add(socket);
+    }
+
+    private void ProcessTradeMessage(string msg, IEnumerable<Action<ITrade>> subs) {
+      var trade = JsonConvert.DeserializeObject<BinanceSpotTrade>(msg);
+      if (trade == null) return;
+      DelegateTrade(trade, subs);
+    }
+
+    private void DelegateTrade(ITrade trade, IEnumerable<Action<ITrade>> subs) {
+      foreach (var sub in subs)
+        sub(trade);
+    }
+
+    private OrderCreationResult CreateOrderCreationResult(BinanceOrder? order) {
+      var oid = order?.Id ?? -1;
+      var matches = (order?.Fills?.Select(x => x.ToSpotTrade()) ?? Enumerable.Empty<BinanceSpotTrade>()).ToArray();
+      foreach(var match in matches)
+        match.OIDBuyer = oid;
+
+      return new OrderCreationResult() {
+        OrderId = oid,
+        MatchedOrders = matches
+      };
+    }
+      
+
+    #region IDisposable Members
+    private bool disposedValue;
+    private void Dispose(bool disposing) {
+      if (!disposedValue) {
+        if (disposing) {
+          cancellationTokenSource.Cancel();
+          foreach(var ws in sockets)
+            ws.Disconnect().Wait();
         }
-        return default(T);
+        disposedValue = true;
       }
     }
 
-    private string Sign(string rawData) {
-      using (HMACSHA256 sha256Hash = new HMACSHA256(Encoding.UTF8.GetBytes(secret))) {
-        byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-        return BitConverter.ToString(bytes).Replace("-", "").ToLower();
-      }
+    public void Dispose() {
+      // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+      Dispose(disposing: true);
+      GC.SuppressFinalize(this);
     }
-
-    private string PrepareQueryString(IDictionary<string, object> query, bool sign = true) {
-      if (sign) {
-        query.Add("recvWindow", 20000);
-        query.Add("timestamp", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + Ping);
-      }
-
-      var queryString = string.Join("&", query
-        .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value?.ToString()))
-        .Select(kvp => $"{kvp.Key}={HttpUtility.UrlEncode(kvp.Value.ToString())}"));
-
-      if (sign)
-        queryString = $"{queryString}&signature={Sign(queryString)}";
-
-      return queryString;
-    }
-    #endregion
+#endregion
   }
-  */
 }

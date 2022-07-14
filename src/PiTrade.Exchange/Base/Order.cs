@@ -1,149 +1,159 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using PiTrade.Exchange.DTOs;
-using PiTrade.Exchange.Entities;
+﻿using System.Linq;
 using PiTrade.Exchange.Enums;
-using PiTrade.Logging;
-using PiTrade.Networking;
+using PiTrade.Exchange.Extensions;
 
 namespace PiTrade.Exchange.Base {
   public sealed class Order : IOrder {
-    private readonly IExchangeAPIClient api;
-    private readonly IList<Func<Order, Task>> whenFilledActions = new List<Func<Order, Task>>();
-    private readonly IList<Func<Order, Task>> whenCanceledActions = new List<Func<Order, Task>>();
-    private readonly IList<Func<Order, Task>> whenFaultedActions = new List<Func<Order, Task>>();
-    private readonly TimeSpan updateInterval = TimeSpan.FromMinutes(2.0);
+    private readonly IList<ITrade> trades = new List<ITrade>();
 
     public long Id { get; private set; }
     public IMarket Market { get; private set; }
+    public OrderType Type { get; private set; }
     public OrderSide Side { get; private set; }
-    public decimal TargetPrice { get; private set; }
-    public decimal Quantity { get; private set; }
-    public decimal Amount => Quantity * TargetPrice;
-    public decimal ExecutedAmount => ExecutedQuantity * AvgFillPrice;
-    public decimal ExecutedQuantity { get; private set; }
-    public decimal AvgFillPrice { get; private set; }
     public OrderState State { get; private set; }
+    public decimal Price { get; private set; }
+    public decimal Quantity { get; private set; }
+    public decimal Amount => Quantity * Price;
+    public decimal ExecutedPrice => Trades.Average(x => x.Price);
+    public decimal ExecutedQuantity => Trades.Sum(x => x.Quantity);
+    public decimal ExecutedAmount => ExecutedQuantity * ExecutedPrice;
+    public IEnumerable<ITrade> Trades => trades.ToArray();
 
-    private DateTime lastUpdate = DateTime.Now;
 
-    private Order(IExchangeAPIClient api, IMarket market) {
-      this.api = api;
+    private Action<IOrder> onExecuted;
+    private Action<IOrder, ITrade> onTrade;
+    private Action<IOrder> onCancel;
+    private Action<IOrder> onError;
+
+    internal Order(IMarket market, OrderSide side, decimal quantity) {
+      Id = -1;
       Market = market;
+      Type = OrderType.Market;
+      Side = side;
+      Quantity = Side switch {
+        OrderSide.BUY => quantity.RoundUp(Market.BaseAssetPrecision),
+        OrderSide.SELL => quantity.RoundDown(Market.BaseAssetPrecision),
+        _ => throw new NotImplementedException()
+      };
+      onExecuted = (o) => OnExecutedWrapper(o);
+      onTrade = (o, t) => OnTradeWrapper(o, t);
+      onCancel = (o) => OnCancelWrapper(o);
+      onError = (o) => OnErrorWrapper(o);
     }
 
-    internal static async Task<Order> Create(IExchangeAPIClient api, IMarket market, Func<Task<OrderDTO?>> creationFnc) {
-      var order = new Order(api, market);
-      market.Register2TradeUpdates(order.OnTradeUpdate);
-      var dto = await creationFnc();
-      order.Init(market, dto);
-      return order;
-    }
-
-    private void Init(IMarket market, OrderDTO? dto) {
-      Market = market;
-      if(dto.HasValue) {
-        Id = dto.Value.Id;
-        Side = dto.Value.Side;
-        TargetPrice = dto.Value.TargetPrice;
-        Quantity = dto.Value.Quantity;
-        State = OrderState.Open;
-      } else {
-        State = OrderState.Faulted;
-      }
-    }
-
-    internal async Task OnTradeUpdate(IMarket market, ITradeUpdate update) {
-      if (lastUpdate.Add(updateInterval) < DateTime.Now) { 
-        lastUpdate = DateTime.Now;
-        await UpdateSelf();
-      }
-      if (State == OrderState.Open && update.Match(Id)) {
-        ExecutedQuantity += update.Quantity;
-        AvgFillPrice += update.Price * (update.Quantity / Quantity);
-        if (Quantity <= ExecutedQuantity) {
-          State = OrderState.Filled;
-          await ExecuteWhenActions(whenFilledActions);
-        }
-      }
-    }
-
-    private async Task UpdateSelf() {
-      var dto = await api.GetOrder(Market, Id);
-      if (dto.HasValue) {
-        ExecutedQuantity = dto.Value.ExecutedQuantity;
-        AvgFillPrice = dto.Value.AvgFillPrice;
-        State = dto.Value.State;
-        if (State == OrderState.Filled)
-          await ExecuteWhenActions(whenFilledActions);
-        else if(State == OrderState.Canceled)
-          await ExecuteWhenActions(whenCanceledActions);
-      }
-    }
-
-    private async Task ExecuteWhenActions(IList<Func<Order, Task>> list) {
-      Market.Unregister2TradeUpdates(OnTradeUpdate);
-      foreach (var fnc in list)
-        await fnc(this);
-      list.Clear();
-    }
-
-    public async Task Cancel() {
-      if (State != OrderState.Filled && State != OrderState.Canceled) {
-        State = OrderState.Canceled;
-        await ExponentialBackoff.Try(async () => !await api.CancelOrder(Market, Id), attempts: 5);
-        await ExecuteWhenActions(whenCanceledActions);
-      }
-    }
-
-    public async Task WhenFilled(Action<IOrder> fnc) => 
-      await WhenFilled(async o => {
-        fnc(o);
-        await Task.CompletedTask;
-      });
-
-    public async Task WhenFilled(Func<IOrder, Task> fnc) {
-      if (State == OrderState.Filled) await fnc(this);
-      else whenFilledActions.Add(fnc);
-    }
-
-    public async Task WhenCanceled(Action<IOrder> fnc) =>
-      await WhenCanceled(async o => {
-        fnc(o);
-        await Task.CompletedTask;
-      });
-
-    public async Task WhenCanceled(Func<IOrder, Task> fnc) {
-      if (State == OrderState.Canceled) await fnc(this);
-      else whenCanceledActions.Add(fnc);
-    }
 
     public override string ToString() =>
-      //$"Id = {Id}, " +
+      $"Id = {Id}, " +
       $"Market = {Market}, " +
       $"Side = {Side}, " +
-      $"Price = {TargetPrice}({AvgFillPrice}), " +
+      $"Type = {Type}, " +
+      $"Price = {Price}({ExecutedPrice}), " +
       $"Quantity = {ExecutedQuantity}/{Quantity}";
 
 
-    #region Disposable Support
-    private bool disposedValue = false;
-    private void Dispose(bool disposing) {
-      if (!disposedValue) {
-        if (disposing) {
-          // TODO: dispose managed state (managed objects)
-        }
-        Cancel().Wait(5000);
-        disposedValue = true;
+    public IOrder For(decimal price) {
+      Type = OrderType.Limit;
+      Price = Side switch {
+        OrderSide.BUY => price.RoundDown(Market.QuoteAssetPrecision),
+        OrderSide.SELL => price.RoundUp(Market.QuoteAssetPrecision),
+        _ => throw new NotImplementedException()
+      };
+      return this;
+    }
+
+
+    public IOrder OnExecuted(Action<IOrder> fnc) {
+      onExecuted = (o) => OnExecutedWrapper(o, fnc);
+      return this;
+    }
+    public IOrder OnExecutedAsync(Func<IOrder, Task> fnc) =>
+      OnExecuted((o) => { Task.Run(async () => await fnc(o)); });
+
+
+    public IOrder OnTrade(Action<IOrder, ITrade> fnc) {
+      onTrade = (o, t) => OnTradeWrapper(o, t, fnc);
+      return this;
+    }
+    public IOrder OnTradeAsync(Func<IOrder, ITrade, Task> fnc) =>
+      OnTrade((o,t) => { Task.Run(async () => await fnc(o,t)); });
+
+
+
+    public IOrder OnCancel(Action<IOrder> fnc) {
+      onCancel = (o) => OnCancelWrapper(o, fnc);
+      return this;
+    }
+    public IOrder OnCancelAsync(Func<IOrder, Task> fnc) =>
+      OnCancel((o) => { Task.Run(async () => await fnc(o)); });
+
+
+    public IOrder OnError(Action<IOrder> fnc) { 
+      onError = (o) => OnErrorWrapper(o, fnc);
+      return this;
+    }
+    public IOrder OnErrorAsync(Func<IOrder, Task> fnc) =>
+      OnError((o) => { Task.Run(async () => await fnc(o)); });
+
+    public async Task<IOrder> Submit() {
+      Market.Subscribe(OnTradeListener);
+      var res = Type switch {
+        OrderType.Market => await Market.Exchange.CreateMarketOrder(Market, Side, Quantity),
+        OrderType.Limit => await Market.Exchange.CreateLimitOrder(Market, Side, Quantity, Price),
+        _ => throw new NotImplementedException("Unknown order type")
+      };
+      Id = res.OrderId;
+      if (Id == -1)
+        onError(this);
+      foreach (var trade in res.MatchedOrders)
+        onTrade(this, trade);
+      return this;
+    }
+
+    public async Task Cancel() {
+      if(Id != -1 && State == OrderState.Open) {
+        Market.Unsubscribe(OnTradeListener);
+        State = OrderState.Canceled;
+        await Market.Exchange.CancelOrder(Market, Id);
+        onCancel(this);
       }
     }
 
-    // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-    ~Order() => Dispose(disposing: false);
+    private void OnExecutedWrapper(IOrder order, Action<IOrder>? fnc = null) {
+      Market.Unsubscribe(OnTradeListener);
+      State = OrderState.Filled;
+      fnc?.Invoke(order);
+    }
+
+    private void OnTradeWrapper(IOrder order, ITrade trade, Action<IOrder, ITrade>? fnc = null) {
+      if(trade.OIDSeller == Id || trade.OIDBuyer == Id) {
+        trades.Add(trade);
+        if (trades.Sum(x => x.Quantity) >= Quantity)
+          onExecuted(order);
+        fnc?.Invoke(order, trade);
+      }
+    }
+
+    private void OnCancelWrapper(IOrder order, Action<IOrder>? fnc = null) {
+      State = OrderState.Canceled;
+      fnc?.Invoke(order);
+    }
+
+    private void OnErrorWrapper(IOrder order, Action<IOrder>? fnc = null) {
+      State = OrderState.Faulted;
+      fnc?.Invoke(order);
+    }
+
+    private void OnTradeListener(ITrade trade) => onTrade(this, trade);
+
+    #region IDisposable Members
+    private bool disposedValue = false;
+    private void Dispose(bool disposing) {
+      if (!disposedValue) {
+        if(disposing)
+          Cancel().Wait();
+        disposedValue = true;
+      }
+    }
 
     public void Dispose() {
       // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method

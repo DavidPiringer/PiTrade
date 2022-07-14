@@ -27,12 +27,12 @@ namespace PiTrade.Exchange.Binance.Domain {
     public IEnumerable<FilterInformation>? Filters { get; set; }
 
     [JsonIgnore]
-    public int? AssetPrecision =>
+    public int? BaseAssetPrecision =>
       CalcPrecision(Filters?.FirstOrDefault(x => x.FilterType == "LOT_SIZE")?.StepSize);
 
 
     [JsonIgnore]
-    public int? QuotePrecision => 
+    public int? QuoteAssetPrecision => 
       CalcPrecision(Filters?.FirstOrDefault(x => x.FilterType == "PRICE_FILTER")?.TickSize);
 
 

@@ -8,22 +8,40 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace PiTrade.Exchange {
+
   public interface IMarket {
-    decimal CurrentPrice { get; }
+    /// <summary>
+    /// the referenced exchange
+    /// </summary>
     IExchange Exchange { get; }
-    Symbol Asset { get; }
-    Symbol Quote { get; }
-    int AssetPrecision { get; }
-    int QuotePrecision { get; }
+    /// <summary>
+    /// the Asset to Buy/Sell
+    /// </summary>
+    Symbol QuoteAsset { get; }
+    /// <summary>
+    /// the Asset to pay/collect with
+    /// </summary>
+    Symbol BaseAsset { get; }
+    int QuoteAssetPrecision { get; }
+    int BaseAssetPrecision { get; }
 
-    Task<IOrder> CreateMarketOrder(OrderSide side, decimal quantity);
-    Task<IOrder> CreateLimitOrder(OrderSide side, decimal price, decimal quantity);
+    /// <summary>
+    /// creates a market sell order (can be upgrade to Limit with IOrder API)
+    /// </summary>
+    /// <param name="quantity">the quantity of the quote asset</param>
+    /// <returns>order instance</returns>
+    IOrder Sell(decimal quantity);
+    /// <summary>
+    /// creates a market buy order (can be upgrade to Limit with IOrder API)
+    /// </summary>
+    /// <param name="quantity">the quantity of the quote asset</param>
+    /// <returns>order instance</returns>
+    IOrder Buy(decimal quantity);
 
-    void Register2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
-    void Unregister2TradeUpdates(Func<IMarket, ITradeUpdate, Task> fnc);
+    void Subscribe(Action<ITrade> onTrade);
+    void SubscribeAsync(Func<ITrade,Task> onTrade);
 
-    void Register2PriceChanges(Func<IMarket, decimal, Task> fnc);
-    void Unregister2PriceChanges(Func<IMarket, decimal, Task> fnc);
-
+    void Unsubscribe(Action<ITrade> onTrade);
+    void UnsubscribeAsync(Func<ITrade, Task> onTrade);
   }
 }
