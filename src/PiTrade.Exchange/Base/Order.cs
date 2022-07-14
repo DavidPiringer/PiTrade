@@ -66,20 +66,33 @@ namespace PiTrade.Exchange.Base {
       onExecuted = (o) => OnExecutedWrapper(o, fnc);
       return this;
     }
+    public IOrder OnExecutedAsync(Func<IOrder, Task> fnc) =>
+      OnExecuted((o) => { Task.Run(async () => await fnc(o)); });
+
 
     public IOrder OnTrade(Action<IOrder, ITrade> fnc) {
       onTrade = (o, t) => OnTradeWrapper(o, t, fnc);
       return this;
     }
+    public IOrder OnTradeAsync(Func<IOrder, ITrade, Task> fnc) =>
+      OnTrade((o,t) => { Task.Run(async () => await fnc(o,t)); });
+
+
 
     public IOrder OnCancel(Action<IOrder> fnc) {
       onCancel = (o) => OnCancelWrapper(o, fnc);
       return this;
     }
+    public IOrder OnCancelAsync(Func<IOrder, Task> fnc) =>
+      OnCancel((o) => { Task.Run(async () => await fnc(o)); });
+
+
     public IOrder OnError(Action<IOrder> fnc) { 
       onError = (o) => OnErrorWrapper(o, fnc);
       return this;
     }
+    public IOrder OnErrorAsync(Func<IOrder, Task> fnc) =>
+      OnError((o) => { Task.Run(async () => await fnc(o)); });
 
     public async Task<IOrder> Submit() {
       Market.Subscribe(OnTradeListener);
@@ -110,6 +123,7 @@ namespace PiTrade.Exchange.Base {
       State = OrderState.Filled;
       fnc?.Invoke(order);
     }
+
     private void OnTradeWrapper(IOrder order, ITrade trade, Action<IOrder, ITrade>? fnc = null) {
       if(trade.OIDSeller == Id || trade.OIDBuyer == Id) {
         trades.Add(trade);

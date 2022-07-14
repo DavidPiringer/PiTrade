@@ -36,7 +36,7 @@ namespace PiTrade.Exchange {
     /// </summary>
     decimal Price { get; }
     /// <summary>
-    /// required quantity of the base asset
+    /// required quantity of the quote asset
     /// </summary>
     decimal Quantity { get; }
     /// <summary>
@@ -73,6 +73,12 @@ namespace PiTrade.Exchange {
     /// <param name="fnc">Callback action</param>
     /// <returns>similar order instance</returns>
     IOrder OnExecuted(Action<IOrder> fnc);
+    /// <summary>
+    /// async version of OnExecuted
+    /// </summary>
+    /// <param name="fnc">Callback action</param>
+    /// <returns>similar order instance</returns>
+    IOrder OnExecutedAsync(Func<IOrder, Task> fnc);
 
     /// <summary>
     /// Set a callback to fire on each trade event in which the order is involved.
@@ -80,6 +86,12 @@ namespace PiTrade.Exchange {
     /// <param name="fnc">Callback action</param>
     /// <returns>similar order instance</returns>
     IOrder OnTrade(Action<IOrder, ITrade> fnc);
+    /// <summary>
+    /// async version of OnTrade
+    /// </summary>
+    /// <param name="fnc">Callback action</param>
+    /// <returns>similar order instance</returns>
+    IOrder OnTradeAsync(Func<IOrder, ITrade, Task> fnc);
 
     /// <summary>
     /// Set a callback to fire when the order is getting canceled.
@@ -87,6 +99,12 @@ namespace PiTrade.Exchange {
     /// <param name="fnc">Callback action</param>
     /// <returns>similar order instance</returns>
     IOrder OnCancel(Action<IOrder> fnc);
+    /// <summary>
+    /// async version of OnCancel
+    /// </summary>
+    /// <param name="fnc">Callback action</param>
+    /// <returns>similar order instance</returns>
+    IOrder OnCancelAsync(Func<IOrder, Task> fnc);
 
     /// <summary>
     /// Set a callback to fire after an error occurred.
@@ -94,6 +112,12 @@ namespace PiTrade.Exchange {
     /// <param name="fnc">Callback action</param>
     /// <returns>similar order instance</returns>
     IOrder OnError(Action<IOrder> action);
+    /// <summary>
+    /// async version of OnError
+    /// </summary>
+    /// <param name="fnc">Callback action</param>
+    /// <returns>similar order instance</returns>
+    IOrder OnErrorAsync(Func<IOrder, Task> fnc);
 
     /// <summary>
     /// Submits the order to the exchange asynchronously.
