@@ -30,9 +30,19 @@ namespace PiTrade.Exchange.Base {
 
     public IOrder Buy(decimal quantity) => new Order(this, OrderSide.BUY, quantity);
 
-    public void Subscribe(Action<ITrade> onTrade) => Exchange.Subscribe(this, onTrade);
-    public void Unsubscribe(Action<ITrade> onTrade) => Exchange.Unsubscribe(this, onTrade);
+    public void Subscribe(Action<ITrade> onTrade) => 
+      Exchange.Subscribe(this, onTrade); 
+    public void SubscribeAsync(Func<ITrade, Task> onTrade) => 
+      Subscribe(t => { Task.Run(async () => await onTrade(t)); });
+
+    public void Unsubscribe(Action<ITrade> onTrade) => 
+      Exchange.Unsubscribe(this, onTrade);
+    public void UnsubscribeAsync(Func<ITrade, Task> onTrade) =>
+      Unsubscribe(t => { Task.Run(async () => await onTrade(t)); });
 
     public override string ToString() => $"{BaseAsset}{QuoteAsset}";
+
+    
+
   }
 }
