@@ -83,12 +83,12 @@ namespace PiTrade.Strategy {
 
     public void Enable() {
       IsEnabled = true;
-      market.Register2PriceChanges(OnPriceChanged);
+      market.Subscribe(OnPriceChangedSync);
     }
 
     public async Task Disable(bool sellAll = true) {
       IsEnabled = false;
-      market.Unregister2PriceChanges(OnPriceChanged);
+      market.Unsubscribe(OnPriceChangedSync);
 
       if (sellAll) {
         IList<Task> tasks = new List<Task>();
@@ -105,13 +105,18 @@ namespace PiTrade.Strategy {
     private async Task CancelAndSell(IOrder? order) {
       if (order != null && order.State == OrderState.Open) {
         Log.Warn($"[{market.QuoteAsset}{market.BaseAsset}] Cancel & Sell [{order}]");
-        await order.Cancel();
-        await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
+        await order.Cancel(); // TODO: Fix selling
+       // await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
       }
     }
 
-    private async Task OnPriceChanged(IMarket market, decimal price) {
+    private void OnPriceChangedSync(ITrade trade) => 
+      Task.Run(async () => await OnPriceChanged(trade));
+
+    private async Task OnPriceChanged(ITrade trade) {
       if (!IsEnabled) return;
+
+      var price = trade.Price;
 
       if (autoDisable && (price > highPrice || lowPrice > price))
         await Disable();
@@ -142,25 +147,23 @@ namespace PiTrade.Strategy {
       while (price.RoundDown(market.BaseAssetPrecision) * quantity.RoundDown(market.QuoteAssetPrecision) < quote)
         quantity *= 1.001m;
 
-      IOrder order = await market.CreateLimitOrder(OrderSide.BUY, price, quantity);
+      IOrder order = await market
+        .Buy(quantity)
+        .For(price)
+        .OnExecuted(o => Task.Run(async () => await Sell(market, o, hits)))
+        .OnCancel(o => { lock (locker) ClearGrids(hits); })
+        .Submit();
+
       lock (locker) {
         foreach (var hit in hits)
           hit.BuyOrder = order;
       }
-      await order.OnTrade(async o => {
-        var commission = await CommissionManager.ManageCommission(o);
-        await Sell(market, o, hits, commission);
-      });
-
-      await order.OnCancel(o => {
-        lock (locker) ClearGrids(hits);
-      });
     }
 
-    private async Task Sell(IMarket market, IOrder buyOrder, IEnumerable<Grid> hits, decimal? buyCommission) {
+    private async Task Sell(IMarket market, IOrder buyOrder, IEnumerable<Grid> hits) {
 
       var quote = AddSellThreshold(hits.Sum(x => x.Quote));
-      var price = AddSellThreshold(buyOrder.AvgFillPrice);
+      var price = AddSellThreshold(buyOrder.ExecutedPrice);
       var quantity = buyOrder.Quantity;
 
       Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] SELL (price = {price})");
@@ -169,28 +172,22 @@ namespace PiTrade.Strategy {
       while (price.RoundDown(market.BaseAssetPrecision) * quantity.RoundDown(market.QuoteAssetPrecision) < quote)
         price *= 1.001m;
 
-      IOrder order = await market.CreateLimitOrder(OrderSide.SELL, price, quantity);
+      IOrder order = await market
+        .Sell(quantity)
+        .For(price)
+        .OnExecuted(o => {
+          lock (locker) {
+            var profit = o.ExecutedAmount - buyOrder.ExecutedAmount; // TODO: Add Commission
+            Profit += profit;
+            ClearGrids(hits);
+          }
+          Log.Info($"SOLD [{o}] Profit = {Profit}");
+        })
+        .OnCancel(o => ClearGrids(hits))
+        .Submit();
+
       foreach (var hit in hits)
         hit.SellOrder = order;
-
-      await order.OnTrade(async o => {
-        var sellCommission = await CommissionManager.ManageCommission(o);
-        lock (locker) {
-          if (sellCommission.HasValue && buyCommission.HasValue) {
-            var profit = o.ExecutedAmount - buyOrder.ExecutedAmount - sellCommission.Value - buyCommission.Value;
-            Profit += profit;
-            var addedProfitPerGrid = profit / hits.Count() * reinvestProfitRatio;
-            foreach (var hit in hits) {
-              if (hit.Quote + addedProfitPerGrid > minQuotePerGrid)
-                hit.Quote += addedProfitPerGrid;
-            }
-          }
-          ClearGrids(hits);
-        }
-        Log.Info($"SOLD [{o}] Profit = {Profit}");
-      });
-
-      await order.OnCancel(o => ClearGrids(hits));
     }
 
     private void ClearGrids(IEnumerable<Grid> grids) {
