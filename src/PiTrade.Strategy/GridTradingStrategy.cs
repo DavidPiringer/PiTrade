@@ -83,12 +83,12 @@ namespace PiTrade.Strategy {
 
     public void Enable() {
       IsEnabled = true;
-      market.Subscribe(OnPriceChangedSync);
+      market.SubscribeAsync(OnPriceChanged);
     }
 
     public async Task Disable(bool sellAll = true) {
       IsEnabled = false;
-      market.Unsubscribe(OnPriceChangedSync);
+      market.UnsubscribeAsync(OnPriceChanged);
 
       if (sellAll) {
         IList<Task> tasks = new List<Task>();
@@ -109,9 +109,6 @@ namespace PiTrade.Strategy {
        // await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
       }
     }
-
-    private void OnPriceChangedSync(ITrade trade) => 
-      Task.Run(async () => await OnPriceChanged(trade));
 
     private async Task OnPriceChanged(ITrade trade) {
       if (!IsEnabled) return;
@@ -150,7 +147,7 @@ namespace PiTrade.Strategy {
       IOrder order = await market
         .Buy(quantity)
         .For(price)
-        .OnExecuted(o => Task.Run(async () => await Sell(market, o, hits)))
+        .OnExecutedAsync(o => Sell(market, o, hits))
         .OnCancel(o => { lock (locker) ClearGrids(hits); })
         .Submit();
 
