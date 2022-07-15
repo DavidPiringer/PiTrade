@@ -130,5 +130,11 @@ namespace PiTrade.Exchange {
     /// </summary>
     Task Cancel();
 
+    /// <summary>
+    /// Cancels the order after a cancellationToken.Cancelation is requested.
+    /// </summary>
+    /// <returns>similar order instance</returns>
+    IOrder CancelAfter(CancellationToken cancellationToken);
+
   }
 }

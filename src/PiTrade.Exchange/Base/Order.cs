@@ -118,6 +118,11 @@ namespace PiTrade.Exchange.Base {
       }
     }
 
+    public IOrder CancelAfter(CancellationToken cancellationToken) {
+      cancellationToken.Register(() => { Task.Run(async () => await Cancel()); });
+      return this;
+    }
+
     private void OnExecutedWrapper(IOrder order, Action<IOrder>? fnc = null) {
       Market.Unsubscribe(OnTradeListener);
       State = OrderState.Filled;
