@@ -65,8 +65,8 @@ namespace PiTrade.Exchange.Binance {
               symbol.Filters != null &&
               symbol.MarketString != null) {
 
-            var baseAssetPrecision = symbol.QuoteAssetPrecision;
-            var quoteAssetPrecision = symbol.BaseAssetPrecision;
+            var baseAssetPrecision = symbol.BaseAssetPrecision; 
+            var quoteAssetPrecision = symbol.QuoteAssetPrecision;
 
             if (quoteAssetPrecision.HasValue && baseAssetPrecision.HasValue) {
               var baseAsset = new Symbol(symbol.BaseAsset);
@@ -134,6 +134,7 @@ namespace PiTrade.Exchange.Binance {
     private void StartMarketWS(IMarket market, IEnumerable<Action<ITrade>> subs) {
       WebSocket socket = new WebSocket(new Uri($"{WSBaseUri}/{MarketString(market).ToLower()}@trade"));
       socket.OnMessage(msg => ProcessTradeMessage(msg, subs));
+      socket.Connect().Wait();
       sockets.Add(socket);
     }
 
