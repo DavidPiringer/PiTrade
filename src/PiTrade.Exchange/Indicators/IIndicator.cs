@@ -11,6 +11,7 @@ namespace PiTrade.Exchange.Indicators {
     TimeSpan Period { get; }
     bool IsReady { get; }
     decimal Value { get; }
-    //void Update(params PriceCandle[] candles);
+    public decimal Variance { get; }
+    public decimal StandardDeviation { get; }
   }
 }

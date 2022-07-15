@@ -9,6 +9,7 @@ using PiTrade.Exchange.Enums;
 
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
+    private readonly IMarket market;
     protected readonly IndicatorValueType valueType;
     protected readonly Queue<decimal> values;
 
@@ -21,19 +22,21 @@ namespace PiTrade.Exchange.Indicators {
     public bool IsReady { get; private set; }
     public TimeSpan Period { get; private set; }
     public decimal Value { get; private set; }
+    public decimal Variance { get; private set; }
+    public decimal StandardDeviation { get; private set; }
 
     public Indicator(IMarket market, TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
       valueType = indicatorValueType;
       values = new Queue<decimal>((int)maxTicks);
       MaxTicks = maxTicks;
       Period = period;
-
-      //market.Register2PriceChanges(OnPriceUpdate);
+      this.market = market;
+      this.market.Subscribe(t => OnPriceUpdate(market, t.Price));
     }
 
     protected abstract decimal Calculate(decimal value);
 
-    private async Task OnPriceUpdate(IMarket market, decimal price) {
+    private void OnPriceUpdate(IMarket market, decimal price) {
       // set lastPrice to price for initialization
       if (lastPrice == decimal.MinValue) lastPrice = price;
 
@@ -58,8 +61,6 @@ namespace PiTrade.Exchange.Indicators {
 
       // add price to current period
       currentPeriod.Add(price);
-
-      await Task.CompletedTask;
     }
 
     private decimal Aggregate(PriceCandle candle) =>
@@ -79,6 +80,12 @@ namespace PiTrade.Exchange.Indicators {
 
       Value = tick == 0 ? value : Calculate(value);
       if (!IsReady) IsReady = (tick++) >= MaxTicks;
+      // Calculate Variance and StdDev
+      if (values.Count > 0) {
+        var avg = values.Average();
+        Variance = values.Sum(x => (x - avg) * (x - avg)) / values.Count;
+        StandardDeviation = (decimal)Math.Sqrt((double)Variance);
+      }
     }
   }
 }
