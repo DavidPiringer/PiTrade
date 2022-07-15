@@ -131,10 +131,10 @@ namespace PiTrade.Exchange {
     Task Cancel();
 
     /// <summary>
-    /// Cancels the order after a cancellationToken.Cancelation is requested.
+    /// Cancels the order after a time span has past.
     /// </summary>
     /// <returns>similar order instance</returns>
-    IOrder CancelAfter(CancellationToken cancellationToken);
+    IOrder CancelAfter(TimeSpan timeSpan);
 
   }
 }

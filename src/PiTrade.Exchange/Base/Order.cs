@@ -5,7 +5,7 @@ using PiTrade.Exchange.Extensions;
 namespace PiTrade.Exchange.Base {
   public sealed class Order : IOrder {
     private readonly IList<ITrade> trades = new List<ITrade>();
-
+    private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
     public long Id { get; private set; }
     public IMarket Market { get; private set; }
     public OrderType Type { get; private set; }
@@ -118,8 +118,9 @@ namespace PiTrade.Exchange.Base {
       }
     }
 
-    public IOrder CancelAfter(CancellationToken cancellationToken) {
-      cancellationToken.Register(() => { Task.Run(async () => await Cancel()); });
+    public IOrder CancelAfter(TimeSpan timeSpan) {
+      cancellationTokenSource.Token.Register(() => { Task.Run(async () => await Cancel()); });
+      cancellationTokenSource.CancelAfter(timeSpan);
       return this;
     }
 
