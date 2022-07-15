@@ -8,6 +8,7 @@ using PiTrade.Exchange.DTOs;
 using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
+using PiTrade.Strategy;
 
 var configPath = args.FirstOrDefault(@"C:\Users\David\Documents\binanceTestConfig.json");
 var config = JObject.Parse(File.ReadAllText(configPath));
@@ -22,6 +23,10 @@ if (key == null || secret == null)
 var exchange = await BinanceExchange.Create(key, secret);
 var markets = exchange.Markets;
 var btcbusd = markets.Where(x => x.BaseAsset == Symbol.BTC && x.QuoteAsset == Symbol.BUSD).First();
+
+var strategy = new StandardDeviationStrategy(btcbusd, 15m, TimeSpan.FromSeconds(6), 3);
+strategy.Start();
+/*
 var order1 = await btcbusd.Sell(0.01m)
   .OnTrade((o, t) => {
     global::System.Console.WriteLine(o);
@@ -41,6 +46,7 @@ var order2 = await btcbusd
     global::System.Console.WriteLine($"Executed {o.Id}");
   }))
   .Submit();
+*/
 
 Console.ReadLine();
 

@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PiTrade.Exchange.Binance\PiTrade.Exchange.Binance.csproj" />
     <ProjectReference Include="..\PiTrade.Exchange\PiTrade.Exchange.csproj" />
+    <ProjectReference Include="..\PiTrade.Strategy\PiTrade.Strategy.csproj" />
   </ItemGroup>
 
 </Project>
