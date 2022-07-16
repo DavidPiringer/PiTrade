@@ -23,7 +23,8 @@ namespace PiTrade.Exchange.Base {
     private Action<IOrder> onExecuted;
     private Action<IOrder, ITrade> onTrade;
     private Action<IOrder> onCancel;
-    private Action<IOrder> onError;
+    private Action<IOrder, Exception> onError;
+    private Func<IOrder, ITrade, bool> cancelIfPredicate;
 
     internal Order(IMarket market, OrderSide side, decimal quantity) {
       Id = -1;
@@ -38,9 +39,9 @@ namespace PiTrade.Exchange.Base {
       onExecuted = (o) => OnExecutedWrapper(o);
       onTrade = (o, t) => OnTradeWrapper(o, t);
       onCancel = (o) => OnCancelWrapper(o);
-      onError = (o) => OnErrorWrapper(o);
+      onError = (o, err) => OnErrorWrapper(o, err);
+      cancelIfPredicate = (o,t) => false;
     }
-
 
     public override string ToString() =>
       $"Id = {Id}, " +
@@ -49,7 +50,6 @@ namespace PiTrade.Exchange.Base {
       $"Type = {Type}, " +
       $"Price = {Price}({ExecutedPrice}), " +
       $"Quantity = {ExecutedQuantity}/{Quantity}";
-
 
     public IOrder For(decimal price) {
       Type = OrderType.Limit;
@@ -60,7 +60,6 @@ namespace PiTrade.Exchange.Base {
       };
       return this;
     }
-
 
     public IOrder OnExecuted(Action<IOrder> fnc) {
       onExecuted = (o) => OnExecutedWrapper(o, fnc);
@@ -77,8 +76,6 @@ namespace PiTrade.Exchange.Base {
     public IOrder OnTradeAsync(Func<IOrder, ITrade, Task> fnc) =>
       OnTrade((o,t) => { Task.Run(async () => await fnc(o,t)); });
 
-
-
     public IOrder OnCancel(Action<IOrder> fnc) {
       onCancel = (o) => OnCancelWrapper(o, fnc);
       return this;
@@ -87,40 +84,56 @@ namespace PiTrade.Exchange.Base {
       OnCancel((o) => { Task.Run(async () => await fnc(o)); });
 
 
-    public IOrder OnError(Action<IOrder> fnc) { 
-      onError = (o) => OnErrorWrapper(o, fnc);
+    public IOrder OnError(Action<IOrder, Exception> fnc) { 
+      onError = (o, err) => OnErrorWrapper(o, err, fnc);
       return this;
     }
-    public IOrder OnErrorAsync(Func<IOrder, Task> fnc) =>
-      OnError((o) => { Task.Run(async () => await fnc(o)); });
+    public IOrder OnErrorAsync(Func<IOrder, Exception, Task> fnc) =>
+      OnError((o, err) => { Task.Run(async () => await fnc(o, err)); });
 
-    public async Task<IOrder> Submit() {
-      Market.Subscribe(OnTradeListener);
-      var res = Type switch {
-        OrderType.Market => await Market.Exchange.CreateMarketOrder(Market, Side, Quantity),
-        OrderType.Limit => await Market.Exchange.CreateLimitOrder(Market, Side, Quantity, Price),
-        _ => throw new NotImplementedException("Unknown order type")
-      };
-      Id = res.OrderId;
-      if (Id == -1)
-        onError(this);
-      foreach (var trade in res.MatchedOrders)
-        onTrade(this, trade);
+
+    public IOrder Submit() {
+      SubmitAsync().Wait();
+      return this;
+    }
+    public async Task<IOrder> SubmitAsync() {
+      try {
+        Market.Subscribe(OnTradeListener);
+        var res = Type switch {
+          OrderType.Market => await Market.Exchange.CreateMarketOrder(Market, Side, Quantity),
+          OrderType.Limit => await Market.Exchange.CreateLimitOrder(Market, Side, Quantity, Price),
+          _ => throw new NotImplementedException("Unknown order type")
+        };
+        Id = res.OrderId;
+        foreach (var trade in res.MatchedOrders)
+          onTrade(this, trade);
+      } catch (Exception ex) {
+        onError(this, ex);
+      }
       return this;
     }
 
-    public async Task Cancel() {
+    public void Cancel() => CancelAsync().Wait();
+    public async Task CancelAsync() {
       if(Id != -1 && State == OrderState.Open) {
-        Market.Unsubscribe(OnTradeListener);
-        State = OrderState.Canceled;
-        await Market.Exchange.CancelOrder(Market, Id);
-        onCancel(this);
+        var isCanceled = await Market.Exchange.CancelOrder(Market, Id);
+        if(isCanceled) {
+          Market.Unsubscribe(OnTradeListener);
+          State = OrderState.Canceled;
+          onCancel(this);
+        }
       }
     }
 
     public IOrder CancelAfter(TimeSpan timeSpan) {
-      cancellationTokenSource.Token.Register(() => { Task.Run(async () => await Cancel()); });
+      cancellationTokenSource.Token.Register(Cancel);
       cancellationTokenSource.CancelAfter(timeSpan);
+      return this;
+    }
+
+
+    public IOrder CancelIf(Func<IOrder, ITrade, bool> predicate) {
+      cancelIfPredicate = predicate;
       return this;
     }
 
@@ -131,32 +144,36 @@ namespace PiTrade.Exchange.Base {
     }
 
     private void OnTradeWrapper(IOrder order, ITrade trade, Action<IOrder, ITrade>? fnc = null) {
-      if(trade.OIDSeller == Id || trade.OIDBuyer == Id) {
-        trades.Add(trade);
-        if (trades.Sum(x => x.Quantity) >= Quantity)
-          onExecuted(order);
-        fnc?.Invoke(order, trade);
-      }
+      fnc?.Invoke(order, trade);
     }
 
     private void OnCancelWrapper(IOrder order, Action<IOrder>? fnc = null) {
-      State = OrderState.Canceled;
       fnc?.Invoke(order);
     }
 
-    private void OnErrorWrapper(IOrder order, Action<IOrder>? fnc = null) {
+    private void OnErrorWrapper(IOrder order, Exception err, Action<IOrder, Exception>? fnc = null) {
+      Market.Unsubscribe(OnTradeListener);
       State = OrderState.Faulted;
-      fnc?.Invoke(order);
+      fnc?.Invoke(order, err);
     }
 
-    private void OnTradeListener(ITrade trade) => onTrade(this, trade);
+    private void OnTradeListener(ITrade trade) {
+      if (trade.OIDSeller == Id || trade.OIDBuyer == Id) {
+        trades.Add(trade);
+        if (trades.Sum(x => x.Quantity) >= Quantity)
+          onExecuted(this);
+        onTrade(this, trade);
+      }
+      if(cancelIfPredicate(this, trade))
+        Cancel();
+    }
 
     #region IDisposable Members
     private bool disposedValue = false;
     private void Dispose(bool disposing) {
       if (!disposedValue) {
         if(disposing)
-          Cancel().Wait();
+          Cancel();
         disposedValue = true;
       }
     }

@@ -111,24 +111,36 @@ namespace PiTrade.Exchange {
     /// </summary>
     /// <param name="fnc">Callback action</param>
     /// <returns>similar order instance</returns>
-    IOrder OnError(Action<IOrder> action);
+    IOrder OnError(Action<IOrder, Exception> action);
     /// <summary>
     /// async version of OnError
     /// </summary>
     /// <param name="fnc">Callback action</param>
     /// <returns>similar order instance</returns>
-    IOrder OnErrorAsync(Func<IOrder, Task> fnc);
+    IOrder OnErrorAsync(Func<IOrder, Exception, Task> fnc);
+
+    /// <summary>
+    /// Submits the order to the exchange.
+    /// </summary>
+    /// <returns>Task with similar order instance</returns>
+    IOrder Submit();
 
     /// <summary>
     /// Submits the order to the exchange asynchronously.
     /// </summary>
     /// <returns>Task with similar order instance</returns>
-    Task<IOrder> Submit();
+
+    Task<IOrder> SubmitAsync();
+
+    /// <summary>
+    /// Cancels the order.
+    /// </summary>
+    void Cancel();
 
     /// <summary>
     /// Cancels the order asynchronously.
     /// </summary>
-    Task Cancel();
+    Task CancelAsync();
 
     /// <summary>
     /// Cancels the order after a time span has past.
@@ -136,5 +148,12 @@ namespace PiTrade.Exchange {
     /// <returns>similar order instance</returns>
     IOrder CancelAfter(TimeSpan timeSpan);
 
+    /// <summary>
+    /// Cancels the order if the predicate is true. 
+    /// The predicate is called for every trade on the market.
+    /// </summary>
+    /// <param name="predicate">Callback to check if order should be canceled</param>
+    /// <returns>similar order instance</returns>
+    IOrder CancelIf(Func<IOrder, ITrade, bool> predicate);
   }
 }
