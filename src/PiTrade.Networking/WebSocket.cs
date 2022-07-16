@@ -48,12 +48,13 @@ namespace PiTrade.Networking {
     }
 
     public async Task SendMessage(string message) {
+      if (socket.State != WebSocketState.Open)
+        throw new InvalidOperationException("WebSocket is not connected!");
+
       try {
-        if (socket != null && cancellationTokenSource != null) {
-          byte[] sendBytes = Encoding.UTF8.GetBytes(message);
-          var sendBuffer = new ArraySegment<byte>(sendBytes);
-          await socket.SendAsync(sendBuffer, WebSocketMessageType.Text, true, cancellationTokenSource.Token);
-        }
+        byte[] sendBytes = Encoding.UTF8.GetBytes(message);
+        var sendBuffer = new ArraySegment<byte>(sendBytes);
+        await socket.SendAsync(sendBuffer, WebSocketMessageType.Text, true, cancellationTokenSource.Token);
       } catch (Exception ex) {
         onError(ex);
       }
@@ -67,6 +68,16 @@ namespace PiTrade.Networking {
       }
     }
 
+    private async Task Reconnect() {
+      await Disconnect();
+      socket.Dispose();
+      cancellationTokenSource.Dispose();
+
+      socket = new ClientWebSocket();
+      cancellationTokenSource = new CancellationTokenSource();
+      await Connect();
+    }
+
     public async Task Disconnect() {
       if (socket.State == WebSocketState.Open) {
         onDisconnect(this);
@@ -76,8 +87,11 @@ namespace PiTrade.Networking {
     }
 
     private void MessageLoop() => Task.Run(async () => {
-      while (!cancellationTokenSource.IsCancellationRequested)
+      while (!cancellationTokenSource.IsCancellationRequested) {
+        if (socket.State != WebSocketState.Open)
+          await Reconnect();
         await NextMessage();
+      }
     });
 
     private async Task NextMessage() {
