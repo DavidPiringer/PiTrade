@@ -13,71 +13,92 @@ namespace PiTrade.Strategy {
     private readonly IMarket market;
     private readonly IIndicator indicator;
     private readonly decimal amountPerBuy;
+    private readonly decimal stdDevFactor;
 
     private bool inTrade = false;
+    private decimal profit;
 
-    public StandardDeviationStrategy(IMarket market, decimal amountPerBuy, TimeSpan interval, uint maxTicks) { 
+    public StandardDeviationStrategy(IMarket market, decimal amountPerBuy, decimal stdDevFactor, TimeSpan interval, uint maxTicks) { 
       this.market = market;
       this.amountPerBuy = amountPerBuy;
+      this.stdDevFactor = stdDevFactor;
       this.indicator = new ExponentialMovingAverage(market, interval, maxTicks);
     }
 
     public void Start() {
-      market.SubscribeAsync(OnTrade);
+      market.Subscribe(OnTrade);
     }
 
     public void Stop() {
-      market.UnsubscribeAsync(OnTrade);
+      market.Unsubscribe(OnTrade);
     }
 
-    private async Task OnTrade(ITrade trade) {
+    private void OnTrade(ITrade trade) {
       if (!indicator.IsReady)
         return;
 
-      // To prevent race conditions
-      bool canTrade = false;
-      lock (locker) {
-        canTrade = !inTrade;
-        inTrade = true;
-      }
+      var stddev = indicator.StandardDeviation * stdDevFactor;
+      var curPrice = indicator.Value;
 
-      if(canTrade) {
-        var buyPrice = indicator.Value - indicator.StandardDeviation;
-        var sellPrice = indicator.Value + indicator.StandardDeviation;
-        var qty = amountPerBuy / (indicator.Value - indicator.StandardDeviation);
+      if(inTrade) {
+        inTrade = true;
+        var buyPrice = indicator.Value - stddev;
+        var sellPrice = indicator.Value + stddev;
+        var qty = amountPerBuy / (indicator.Value - stddev);
         var test = qty * buyPrice;
-        await market
+        market
           .Buy(qty)
           .For(buyPrice)
-          .OnExecutedAsync(o => Sell(o, sellPrice))
-          .OnError(_ => CleanUp())
+          .OnExecuted(o => Sell(o, sellPrice, stddev))
+          .OnCancel(_ => CleanUp())
+          .OnError(HandleError)
+          .CancelAfter(TimeSpan.FromSeconds(6))
           .Submit();
         Console.WriteLine($"Buy {qty} for {buyPrice}");
       }
     }
 
-    private async Task Sell(IOrder buyOrder, decimal sellPrice) {
+    private void Sell(IOrder buyOrder, decimal sellPrice, decimal stddev) {
       var qty = buyOrder.ExecutedQuantity;
+      // increase the sellPrice minimal to match "amountPerBuy"
       if (qty * sellPrice < amountPerBuy)
         sellPrice *= 1.000001m;
-      await market
+      market
         .Sell(qty)
         .For(sellPrice)
         .OnExecuted(o => CleanUp(buyOrder, o))
-        .OnError(_ => CleanUp())
+        .OnError(HandleError)
+        .OnCancel(o => EmergencySell(o, buyOrder))
+        .CancelIf((o,t) => CheckEmergencySell(o,t,stddev))
         .Submit();
       Console.WriteLine($"Sell {qty} for {sellPrice}");
     }
 
     private void CleanUp(IOrder? buyOrder = null, IOrder? sellOrder = null) {
-      if (buyOrder != null && sellOrder != null) { 
-        var profit = sellOrder.ExecutedAmount - buyOrder.ExecutedAmount;
+      if (buyOrder != null && sellOrder != null) {
+        profit += sellOrder.ExecutedAmount - buyOrder.ExecutedAmount;
         Console.WriteLine($"Profit = {profit}");
-      } else {
-        Console.WriteLine("An Error occured!");
       }
-      lock (locker)
-        inTrade = false;
+      inTrade = false;
+    }
+
+    private bool CheckEmergencySell(IOrder order, ITrade trade, decimal stddev) {
+      var thresholdPrice = order.Price - stdDevFactor * 4m * stddev;
+      return trade.Price < thresholdPrice;
+    }
+
+    private void EmergencySell(IOrder order, IOrder buyOrder) {
+      Console.WriteLine("!!! Emergency Sell !!!");
+      market
+        .Sell(order.Quantity)
+        .OnExecuted(async o => {
+          Task.Delay(TimeSpan.FromSeconds(10)).Wait();
+          CleanUp(buyOrder, o);
+        }).Submit();
+    }
+
+    private void HandleError(IOrder order, Exception ex) {
+      Console.WriteLine($"An Error occured! -> {ex.Message}");
     }
 
 
