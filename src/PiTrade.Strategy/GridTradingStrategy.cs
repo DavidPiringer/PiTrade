@@ -105,7 +105,7 @@ namespace PiTrade.Strategy {
     private async Task CancelAndSell(IOrder? order) {
       if (order != null && order.State == OrderState.Open) {
         Log.Warn($"[{market.QuoteAsset}{market.BaseAsset}] Cancel & Sell [{order}]");
-        await order.Cancel(); // TODO: Fix selling
+        await order.CancelAsync(); // TODO: Fix selling
        // await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
       }
     }
@@ -149,7 +149,7 @@ namespace PiTrade.Strategy {
         .For(price)
         .OnExecutedAsync(o => Sell(market, o, hits))
         .OnCancel(o => { lock (locker) ClearGrids(hits); })
-        .Submit();
+        .SubmitAsync();
 
       lock (locker) {
         foreach (var hit in hits)
@@ -181,7 +181,7 @@ namespace PiTrade.Strategy {
           Log.Info($"SOLD [{o}] Profit = {Profit}");
         })
         .OnCancel(o => ClearGrids(hits))
-        .Submit();
+        .SubmitAsync();
 
       foreach (var hit in hits)
         hit.SellOrder = order;
