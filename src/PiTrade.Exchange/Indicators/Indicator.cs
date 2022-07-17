@@ -70,6 +70,7 @@ namespace PiTrade.Exchange.Indicators {
         IndicatorValueType.Close => candle.Close,
         IndicatorValueType.Min => candle.Min,
         IndicatorValueType.Max => candle.Max,
+        IndicatorValueType.Typical => (candle.Min + candle.Max + candle.Close) / 3.0m,
         _ => candle.Average
       };
 

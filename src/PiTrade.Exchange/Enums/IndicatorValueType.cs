@@ -6,6 +6,6 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange.Enums {
   public enum IndicatorValueType {
-    Average, Open, Close, Min, Max
+    Average, Open, Close, Min, Max, Typical
   }
 }
