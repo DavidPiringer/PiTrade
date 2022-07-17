@@ -91,7 +91,6 @@ namespace PiTrade.Exchange.Base {
     public IOrder OnErrorAsync(Func<IOrder, Exception, Task> fnc) =>
       OnError((o, err) => { Task.Run(async () => await fnc(o, err)); });
 
-
     public IOrder Submit() {
       SubmitAsync().Wait();
       return this;

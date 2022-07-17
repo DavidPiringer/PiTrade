@@ -122,13 +122,13 @@ namespace PiTrade.Exchange {
     /// <summary>
     /// Submits the order to the exchange.
     /// </summary>
-    /// <returns>Task with similar order instance</returns>
+    /// <returns> similar order instance</returns>
     IOrder Submit();
 
     /// <summary>
     /// Submits the order to the exchange asynchronously.
     /// </summary>
-    /// <returns>Task with similar order instance</returns>
+    /// <returns>similar order instance</returns>
 
     Task<IOrder> SubmitAsync();
 
