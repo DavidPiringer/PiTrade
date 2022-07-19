@@ -11,11 +11,11 @@ using PiTrade.Logging;
 
 namespace PiTrade.Exchange.Binance {
   internal class BinanceHttpClient {
-#if DEBUG
-    private const string BaseUri = "https://testnet.binance.vision";
-#else
+//#if DEBUG
+//    private const string BaseUri = "https://testnet.binance.vision";
+//#else
     private const string BaseUri = "https://api.binance.com";
-#endif
+//#endif
 
 
     private readonly object locker = new object();

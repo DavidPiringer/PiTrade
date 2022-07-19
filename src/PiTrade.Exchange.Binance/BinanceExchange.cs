@@ -15,22 +15,26 @@ using System.Web;
 
 namespace PiTrade.Exchange.Binance {
   public sealed class BinanceExchange : IExchange, IDisposable {
-#if DEBUG
-    private const string WSBaseUri = "wss://testnet.binance.vision/ws";
-#else
+//#if DEBUG
+//    private const string WSBaseUri = "wss://testnet.binance.vision/ws";
+//#else
     private const string WSBaseUri = "wss://stream.binance.com:9443/ws";
-#endif
+//#endif
     private readonly object locker = new object();
     private readonly BinanceHttpClient client;
     private readonly IDictionary<IMarket, ISet<Action<ITrade>>> tradeSubscriptions;
     private CancellationTokenSource cancellationTokenSource;
     private IList<WebSocket> sockets = new List<WebSocket>();
 
+    public decimal MinimalAmountPerOrder => 10.0m;
+
     private IEnumerable<IMarket> markets = Enumerable.Empty<IMarket>();
     public IEnumerable<IMarket> Markets {
       get { lock (locker) { return markets; } }
       private set { lock (locker) { markets = value; } }
     }
+
+
 
     private BinanceExchange(string key, string secret) {
       cancellationTokenSource = new CancellationTokenSource();

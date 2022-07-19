@@ -13,6 +13,7 @@ namespace PiTrade.Exchange {
   }
 
   public interface IExchange {
+    decimal MinimalAmountPerOrder { get; }
     IEnumerable<IMarket> Markets { get; }
 
     Task<OrderCreationResult> CreateMarketOrder(
