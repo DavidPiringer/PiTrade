@@ -16,7 +16,6 @@ namespace PiTrade.Strategy {
 
     private decimal profit;
     private decimal curHoldingQty;
-    private decimal curAmountIn;
     private Action<ITrade> state;
 
     private decimal MACD => fast.Value - slow.Value;
@@ -53,7 +52,7 @@ namespace PiTrade.Strategy {
       if(IsBullish) {
         state = EmptyState;
         var buyPrice = fast.Value;
-        var qty = (amountPerBuy - curAmountIn) / buyPrice;
+        var qty = amountPerBuy / buyPrice;
         Console.WriteLine($"Buy {qty} for ~{buyPrice}");
         market
           .Buy(qty)
