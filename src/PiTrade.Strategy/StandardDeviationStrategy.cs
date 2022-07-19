@@ -4,25 +4,28 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange;
+using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Indicators;
 
 namespace PiTrade.Strategy {
   public class StandardDeviationStrategy {
-    private readonly object locker = new object();
-
     private readonly IMarket market;
     private readonly IIndicator indicator;
     private readonly decimal amountPerBuy;
-    private readonly decimal stdDevFactor;
+    private readonly decimal stdDevBuyMultiplier;
+    private readonly decimal stdDevSellMultiplier;
 
-    private bool inTrade = false;
     private decimal profit;
+    private Action<ITrade> state;
+    private decimal curHoldingQty;
 
-    public StandardDeviationStrategy(IMarket market, decimal amountPerBuy, decimal stdDevFactor, TimeSpan interval, uint maxTicks) { 
+    public StandardDeviationStrategy(IMarket market, decimal amountPerBuy, decimal stdDevBuyMultiplier, decimal stdDevSellMultiplier, TimeSpan interval, uint maxTicks) { 
       this.market = market;
       this.amountPerBuy = amountPerBuy;
-      this.stdDevFactor = stdDevFactor;
-      this.indicator = new ExponentialMovingAverage(market, interval, maxTicks);
+      this.stdDevBuyMultiplier = stdDevBuyMultiplier;
+      this.stdDevSellMultiplier = stdDevSellMultiplier;
+      this.indicator = new SimpleMovingAverage(market, interval, maxTicks, IndicatorValueType.Typical);
+      state = BuyState;
     }
 
     public void Start() {
@@ -34,73 +37,59 @@ namespace PiTrade.Strategy {
     }
 
     private void OnTrade(ITrade trade) {
-      if (!indicator.IsReady)
-        return;
-
-      var stddev = indicator.StandardDeviation * stdDevFactor;
-      var curPrice = indicator.Value;
-
-      if(inTrade) {
-        inTrade = true;
-        var buyPrice = indicator.Value - stddev;
-        var sellPrice = indicator.Value + stddev;
-        var qty = amountPerBuy / (indicator.Value - stddev);
-        var test = qty * buyPrice;
-        market
-          .Buy(qty)
-          .For(buyPrice)
-          .OnExecuted(o => Sell(o, sellPrice, stddev))
-          .OnCancel(_ => CleanUp())
-          .OnError(HandleError)
-          .CancelAfter(TimeSpan.FromSeconds(6))
-          .Submit();
-        Console.WriteLine($"Buy {qty} for {buyPrice}");
-      }
+      if (indicator.IsReady)
+        state(trade);
+      else
+        Console.WriteLine("Indicator not ready!");
     }
 
-    private void Sell(IOrder buyOrder, decimal sellPrice, decimal stddev) {
-      var qty = buyOrder.ExecutedQuantity;
-      // increase the sellPrice minimal to match "amountPerBuy"
-      if (qty * sellPrice < amountPerBuy)
-        sellPrice *= 1.000001m;
+    private void EmptyState(ITrade trade) { }
+
+    private void BuyState(ITrade trade) {
+      var buyPrice = indicator.Value - (indicator.StandardDeviation * stdDevBuyMultiplier);
+      var qty = amountPerBuy / buyPrice;
+      Console.WriteLine($"Buy {qty} for {buyPrice}");
+      state = EmptyState;
       market
-        .Sell(qty)
-        .For(sellPrice)
-        .OnExecuted(o => CleanUp(buyOrder, o))
+        .Buy(qty)
+        .For(buyPrice)
+        .OnExecuted(Bought)
         .OnError(HandleError)
-        .OnCancel(o => EmergencySell(o, buyOrder))
-        .CancelIf((o,t) => CheckEmergencySell(o,t,stddev))
+        .OnCancel(o => state = BuyState)
+        .CancelAfter(indicator.Period)
         .Submit();
-      Console.WriteLine($"Sell {qty} for {sellPrice}");
     }
 
-    private void CleanUp(IOrder? buyOrder = null, IOrder? sellOrder = null) {
-      if (buyOrder != null && sellOrder != null) {
-        profit += sellOrder.ExecutedAmount - buyOrder.ExecutedAmount;
-        Console.WriteLine($"Profit = {profit}");
-      }
-      inTrade = false;
-    }
-
-    private bool CheckEmergencySell(IOrder order, ITrade trade, decimal stddev) {
-      var thresholdPrice = order.Price - stdDevFactor * 4m * stddev;
-      return trade.Price < thresholdPrice;
-    }
-
-    private void EmergencySell(IOrder order, IOrder buyOrder) {
-      Console.WriteLine("!!! Emergency Sell !!!");
+    private void SellState(ITrade trade) {
+      var sellPrice = indicator.Value + (indicator.StandardDeviation * stdDevSellMultiplier);
+      Console.WriteLine($"Sell {curHoldingQty} for {sellPrice}");
+      state = EmptyState;
       market
-        .Sell(order.Quantity)
-        .OnExecuted(async o => {
-          Task.Delay(TimeSpan.FromSeconds(10)).Wait();
-          CleanUp(buyOrder, o);
-        }).Submit();
+        .Sell(curHoldingQty)
+        .For(sellPrice)
+        .OnExecuted(Sold)
+        .OnError(HandleError)
+        .OnCancel(o => state = SellState)
+        .CancelAfter(indicator.Period)
+        .Submit();
+    }
+
+    private void Bought(IOrder buyOrder) {
+      curHoldingQty += buyOrder.ExecutedQuantity;
+      profit -= buyOrder.ExecutedAmount;
+      state = SellState;
+    }
+
+    private void Sold(IOrder sellOrder) {
+      curHoldingQty -= sellOrder.ExecutedQuantity;
+      profit += sellOrder.ExecutedAmount;
+      Console.WriteLine($"Profit = {profit}");
+      state = BuyState;
     }
 
     private void HandleError(IOrder order, Exception ex) {
       Console.WriteLine($"An Error occured! -> {ex.Message}");
     }
-
 
   }
 }
