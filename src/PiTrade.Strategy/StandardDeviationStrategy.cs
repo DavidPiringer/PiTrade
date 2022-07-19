@@ -24,7 +24,7 @@ namespace PiTrade.Strategy {
       this.amountPerBuy = amountPerBuy;
       this.stdDevBuyMultiplier = stdDevBuyMultiplier;
       this.stdDevSellMultiplier = stdDevSellMultiplier;
-      this.indicator = new SimpleMovingAverage(market, interval, maxTicks, IndicatorValueType.Typical);
+      this.indicator = new SimpleMovingAverage(interval, maxTicks, IndicatorValueType.Typical);
       state = BuyState;
     }
 
