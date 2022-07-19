@@ -13,13 +13,13 @@ namespace PiTrade.Exchange.Indicators {
     private readonly IIndicator ema12;
 
 
-    public MovingAverageConvergenceDivergence(IMarket market, TimeSpan period,
+    public MovingAverageConvergenceDivergence(TimeSpan period,
       IndicatorValueType indicatorValueType = IndicatorValueType.Close)
-      : base(market, period, 26, indicatorValueType) { 
-      ema26 = new ExponentialMovingAverage(market, period, 26, indicatorValueType);
-      ema12 = new ExponentialMovingAverage(market, period, 12, indicatorValueType);
+      : base(period, 26, indicatorValueType) { 
+      ema26 = new ExponentialMovingAverage(period, 26, indicatorValueType);
+      ema12 = new ExponentialMovingAverage(period, 12, indicatorValueType);
     }
 
-    protected override decimal Calculate(decimal value) => ema12.Value - ema26.Value;
+    protected override decimal Calculate(IEnumerable<decimal> values) => ema12.Value - ema26.Value;
   }
 }

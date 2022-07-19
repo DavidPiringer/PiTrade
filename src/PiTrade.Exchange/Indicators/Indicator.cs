@@ -9,9 +9,8 @@ using PiTrade.Exchange.Enums;
 
 namespace PiTrade.Exchange.Indicators {
   public abstract class Indicator : IIndicator {
-    private readonly IMarket market;
     protected readonly IndicatorValueType valueType;
-    protected readonly Queue<decimal> values;
+    private readonly Queue<decimal> values;
 
     private DateTime lastPeriod = DateTime.Now;
     private IList<decimal> currentPeriod = new List<decimal>();
@@ -22,23 +21,24 @@ namespace PiTrade.Exchange.Indicators {
     public bool IsReady { get; private set; }
     public TimeSpan Period { get; private set; }
     public decimal Value { get; private set; }
+    public decimal ValuePreview { get; private set; }
     public decimal Variance { get; private set; }
     public decimal StandardDeviation { get; private set; }
 
-    public Indicator(IMarket market, TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
+    public Indicator(TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
       valueType = indicatorValueType;
       values = new Queue<decimal>((int)maxTicks);
       MaxTicks = maxTicks;
       Period = period;
-      this.market = market;
-      this.market.Subscribe(t => OnPriceUpdate(market, t.Price));
+      //this.market.Subscribe(t => OnPriceUpdate(market, t.Price));
     }
 
-    protected abstract decimal Calculate(decimal value);
+    protected abstract decimal Calculate(IEnumerable<decimal> values);
 
-    private void OnPriceUpdate(IMarket market, decimal price) {
+    public void OnTrade(ITrade trade) => OnTrade(trade.Price);
+    public void OnTrade(decimal value) {
       // set lastPrice to price for initialization
-      if (lastPrice == decimal.MinValue) lastPrice = price;
+      if (lastPrice == decimal.MinValue) lastPrice = value;
 
       // loop through periods if the last update is older than 'Period'
       Queue<PriceCandle> candles = new Queue<PriceCandle>();
@@ -57,10 +57,11 @@ namespace PiTrade.Exchange.Indicators {
       // update periods and lastPrice
       if (lastPeriod.Add(Period).CompareTo(DateTime.Now) < 0)
         lastPeriod = DateTime.Now;
-      lastPrice = price;
+      lastPrice = value;
 
       // add price to current period
-      currentPeriod.Add(price);
+      currentPeriod.Add(value);
+      PreviewCandle(new PriceCandle(currentPeriod.ToArray(), lastPeriod.Add(Period), Period));
     }
 
     private decimal Aggregate(PriceCandle candle) =>
@@ -79,7 +80,7 @@ namespace PiTrade.Exchange.Indicators {
       if (IsReady) values.Dequeue();
       values.Enqueue(value);
 
-      Value = tick == 0 ? value : Calculate(value);
+      Value = tick == 0 ? value : Calculate(values);
       if (!IsReady) IsReady = (tick++) >= MaxTicks;
       // Calculate Variance and StdDev
       if (values.Count > 0) {
@@ -87,6 +88,15 @@ namespace PiTrade.Exchange.Indicators {
         Variance = values.Sum(x => (x - avg) * (x - avg)) / values.Count;
         StandardDeviation = (decimal)Math.Sqrt((double)Variance);
       }
+    }
+
+    private void PreviewCandle(PriceCandle candle) {
+      var value = Aggregate(candle);
+      var tmpValues = new Queue<decimal>(values);
+      if (IsReady) tmpValues.Dequeue();
+      tmpValues.Enqueue(value);
+
+      ValuePreview = tick == 0 ? value : Calculate(tmpValues);
     }
   }
 }

@@ -8,9 +8,9 @@ using PiTrade.Exchange.Enums;
 namespace PiTrade.Exchange.Indicators {
   public class Minimum : Indicator {
 
-    public Minimum(IMarket market, TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close)
-      : base(market, period, maxTicks, indicatorValueType) { }
+    public Minimum(TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close)
+      : base(period, maxTicks, indicatorValueType) { }
 
-    protected override decimal Calculate(decimal value) => values.Min();
+    protected override decimal Calculate(IEnumerable<decimal> values) => values.Min();
   }
 }

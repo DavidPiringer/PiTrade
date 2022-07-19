@@ -8,9 +8,9 @@ using PiTrade.Exchange.Enums;
 namespace PiTrade.Exchange.Indicators {
   public class SimpleMovingAverage : Indicator {
 
-    public SimpleMovingAverage(IMarket market, TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close)
-      : base(market, period, maxTicks, indicatorValueType) { }
+    public SimpleMovingAverage(TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close)
+      : base(period, maxTicks, indicatorValueType) { }
 
-    protected override decimal Calculate(decimal value) => values.Average();
+    protected override decimal Calculate(IEnumerable<decimal> values) => values.Average();
   }
 }
