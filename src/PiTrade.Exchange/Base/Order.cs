@@ -4,6 +4,7 @@ using PiTrade.Exchange.Extensions;
 
 namespace PiTrade.Exchange.Base {
   public sealed class Order : IOrder {
+    private readonly IList<ITrade> tmpTrades = new List<ITrade>();
     private readonly IList<ITrade> trades = new List<ITrade>();
     private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
     public long Id { get; private set; }
@@ -14,10 +15,10 @@ namespace PiTrade.Exchange.Base {
     public decimal Price { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal Amount => Quantity * Price;
-    public decimal ExecutedPrice => Trades.Average(x => x.Price);
-    public decimal ExecutedQuantity => Trades.Sum(x => x.Quantity);
+    public decimal ExecutedPrice => Trades.Count() > 0 ? Trades.Average(x => x.Price) : 0;
+    public decimal ExecutedQuantity => Trades.Count() > 0 ? Trades.Sum(x => x.Quantity) : 0;
     public decimal ExecutedAmount => ExecutedQuantity * ExecutedPrice;
-    public IEnumerable<ITrade> Trades => trades.ToArray();
+    public IEnumerable<ITrade> Trades => trades;
 
 
     private Action<IOrder> onExecuted;
@@ -105,7 +106,7 @@ namespace PiTrade.Exchange.Base {
         };
         Id = res.OrderId;
         foreach (var trade in res.MatchedOrders)
-          onTrade(this, trade);
+          OnTradeListener(trade);
       } catch (Exception ex) {
         onError(this, ex);
       }
@@ -153,18 +154,34 @@ namespace PiTrade.Exchange.Base {
     private void OnErrorWrapper(IOrder order, Exception err, Action<IOrder, Exception>? fnc = null) {
       Market.Unsubscribe(OnTradeListener);
       State = OrderState.Faulted;
+      Console.WriteLine($"Order [{this}] faulted!");
       fnc?.Invoke(order, err);
     }
 
     private void OnTradeListener(ITrade trade) {
+      HandleEarlyTradeMatches(trade);
+
       if (trade.OIDSeller == Id || trade.OIDBuyer == Id) {
         trades.Add(trade);
-        if (trades.Sum(x => x.Quantity) >= Quantity)
+        if (ExecutedQuantity >= Quantity)
           onExecuted(this);
         onTrade(this, trade);
       }
       if(cancelIfPredicate(this, trade))
         Cancel();
+    }
+
+    // buffer trades matching this order
+    // -> when the response with the id takes longer as expected
+    private void HandleEarlyTradeMatches(ITrade trade) {
+      if (Id == -1)
+        tmpTrades.Add(trade);
+      else if (Id != -1 && tmpTrades.Count > 0) {
+        var tmp = tmpTrades.ToArray();
+        tmpTrades.Clear();
+        foreach (var tmpTrade in tmp)
+          OnTradeListener(tmpTrade);
+      }
     }
 
     #region IDisposable Members
