@@ -27,7 +27,7 @@ if (key == null || secret == null)
 var exchange = await BinanceExchange.Create(key, secret);
 var markets = exchange.Markets;
 var btcbusd = markets.Where(x => x.BaseAsset == Symbol.BTC && x.QuoteAsset == Symbol.BUSD).First();
-var strategy = new MACDStrategy(btcbusd, 20m, TimeSpan.FromMinutes(1), 24, 15, 4);
+var strategy = new MACDStrategy(btcbusd, 20m, TimeSpan.FromMinutes(1), 180, 24, 15, 4);
 //var strategy = new StandardDeviationStrategy(btcbusd, 20m, 1m, 0m, TimeSpan.FromMinutes(1), 8);
 strategy.Start();
 Console.WriteLine("Press Enter to stop ...");
