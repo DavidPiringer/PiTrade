@@ -9,7 +9,6 @@ using PiTrade.Exchange.Enums;
 using PiTrade.Exchange.Extensions;
 using PiTrade.Exchange.Indicators;
 using PiTrade.Logging;
-using PiTrade.Strategy.ConfigDTOs;
 using PiTrade.Strategy.Util;
 
 namespace PiTrade.Strategy {
@@ -24,179 +23,138 @@ namespace PiTrade.Strategy {
       public decimal Price { get; set; }
       public IOrder? BuyOrder { get; set; }
       public IOrder? SellOrder { get; set; }
-      public bool IsFree { get; set; } = true;
-      public decimal Quote { get; set; }
+      public decimal Quantity { get; set; }
       private Grid() { }
-      public Grid(decimal price, decimal quote) {
+      public Grid(decimal price, decimal amount) {
         Price = price;
-        Quote = quote;
+        Quantity = amount / price;
       }
       public override string ToString() => $"GRID Price = [{Price}] | BuyOrder = [{BuyOrder}] | SellOrder = [{SellOrder}]";
     }
 
     private readonly IMarket market;
-    private readonly decimal minQuotePerGrid;
-    private readonly decimal reinvestProfitRatio;
     private readonly decimal highPrice;
     private readonly decimal lowPrice;
     private readonly decimal sellThreshold;
-    private readonly bool autoDisable;
+    private readonly bool autoStop;
     private readonly Grid[] grids;
-    private readonly object locker = new object();
 
     private decimal LastPrice { get; set; } = decimal.MinValue;
 
-    public bool IsEnabled { get; set; }
+    public bool IsRunning { get; set; }
 
     public static decimal Profit { get; private set; }
 
-    public GridTradingStrategy(IMarket market, GridTradingStrategyConfig config) :
-      this(market, 
-        config.MinQuotePerGrid, config.ReinvestProfitRatio, 
-        config.HighPrice, config.LowPrice, 
-        config.GridCount, config.SellThreshold, 
-        config.AutoDisable) { }
-
     public GridTradingStrategy(IMarket market,
-      decimal minQuotePerGrid, decimal reinvestProfitRatio,
+      decimal minAmountPerGrid,
       decimal p1, decimal p2,
       uint gridCount, decimal sellThreshold,
-      bool autoDisable = true) {
+      bool autoStop = true) {
 
-      if (reinvestProfitRatio < 0 || reinvestProfitRatio > 1.0m)
-        throw new ArgumentException("Reinvest Profit Ratio needs to be between 0.0 and 1.0.");
       if (gridCount == 0)
         throw new ArgumentException("Grid Count needs to be higher than 0.");
 
-
       this.market = market;
-      this.minQuotePerGrid = minQuotePerGrid;
-      this.reinvestProfitRatio = reinvestProfitRatio;
       this.highPrice = Math.Max(p1, p2);
       this.lowPrice = Math.Min(p1, p2);
       this.sellThreshold = sellThreshold;
-      this.autoDisable = autoDisable;
+      this.autoStop = autoStop;
       this.grids = NumSpace.Linear(highPrice, lowPrice, gridCount)
-                           .Select(x => new Grid(x, minQuotePerGrid)).ToArray();
+                           .Select(x => new Grid(x, minAmountPerGrid)).ToArray();
       PrintGrids();
     }
 
-    public void Enable() {
-      IsEnabled = true;
-      market.SubscribeAsync(OnPriceChanged);
+    public void Start() {
+      IsRunning = true;
+      market.Subscribe(OnPriceChanged);
     }
 
-    public async Task Disable(bool sellAll = true) {
-      IsEnabled = false;
-      market.UnsubscribeAsync(OnPriceChanged);
-
-      if (sellAll) {
-        IList<Task> tasks = new List<Task>();
-        foreach (var grid in grids) {
-          tasks.Add(CancelAndSell(grid.BuyOrder));
-          tasks.Add(CancelAndSell(grid.SellOrder));
-          grid.BuyOrder = null;
-          grid.SellOrder = null;
-        }
-        await Task.WhenAll(tasks);
-      }
+    public void Stop() {
+      IsRunning = false;
+      market.Unsubscribe(OnPriceChanged);
     }
 
-    private async Task CancelAndSell(IOrder? order) {
-      if (order != null && order.State == OrderState.Open) {
-        Log.Warn($"[{market.QuoteAsset}{market.BaseAsset}] Cancel & Sell [{order}]");
-        await order.CancelAsync(); // TODO: Fix selling
-       // await order.WhenCanceled(async x => await market.CreateMarketOrder(OrderSide.SELL, x.ExecutedQuantity));
-      }
-    }
-
-    private async Task OnPriceChanged(ITrade trade) {
-      if (!IsEnabled) return;
+    private void OnPriceChanged(ITrade trade) {
+      if (!IsRunning) return;
 
       var price = trade.Price;
 
-      if (autoDisable && (price > highPrice || lowPrice > price))
-        await Disable();
+      if (CancelCondition(trade))
+        Stop();
 
-      Grid[] hits = new Grid[0];
-      lock (locker) {
-        hits = grids.Where(x =>
-          LastPrice > x.Price &&
+      Grid[] hits = grids
+        .Where(x => 
+          LastPrice > x.Price && 
           x.Price >= price &&
-          x.IsFree).ToArray();
+          x.BuyOrder == null &&
+          x.SellOrder == null)
+        .ToArray();
 
-        LastPrice = price;
-        foreach (var hit in hits)
-          hit.IsFree = false;
-      }
+      LastPrice = price;
 
-      if (hits.Length > 0) await Buy(market, price, hits);
+      if (hits.Length > 0) Buy(market, price, hits);
     }
 
-    private async Task Buy(IMarket market, decimal price, IEnumerable<Grid> hits) {
+    private void Buy(IMarket market, decimal price, IEnumerable<Grid> hits) {
       Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] BUY (price = {price})");
 
-      var quote = hits.Sum(x => x.Quote);
-      var hitCount = hits.Count();
-      var quantity = GetQuantity(quote, price) * hitCount;
+      var quantity = hits.Sum(x => x.Quantity);
 
-      // adjust quantity to be greater or equal the quotePerGrid
-      while (price.RoundDown(market.BaseAssetPrecision) * quantity.RoundDown(market.QuoteAssetPrecision) < quote)
-        quantity *= 1.001m;
-
-      IOrder order = await market
+      IOrder order = market
         .Buy(quantity)
         .For(price)
-        .OnExecutedAsync(o => Sell(market, o, hits))
-        .OnCancel(o => { lock (locker) ClearGrids(hits); })
-        .SubmitAsync();
+        .OnExecuted(o => Sell(o, hits))
+        .OnCancel(o => ClearBuyGrids(hits))
+        .CancelIf((o,t) => CancelCondition(t))
+        .Submit();
 
-      lock (locker) {
-        foreach (var hit in hits)
-          hit.BuyOrder = order;
-      }
+      foreach (var hit in hits)
+        hit.BuyOrder = order;
     }
 
-    private async Task Sell(IMarket market, IOrder buyOrder, IEnumerable<Grid> hits) {
+    private void ClearBuyGrids(IEnumerable<Grid> hits) {
+      foreach (var hit in hits)
+        hit.BuyOrder = null;
+    }
 
-      var quote = AddSellThreshold(hits.Sum(x => x.Quote));
-      var price = AddSellThreshold(buyOrder.ExecutedPrice);
+    private bool CancelCondition(ITrade trade) =>
+      autoStop && (trade.Price > highPrice || lowPrice > trade.Price);
+
+    private void Sell(IOrder buyOrder, IEnumerable<Grid> hits) {
+
+      var price = buyOrder.ExecutedPrice * (1m + sellThreshold);
       var quantity = buyOrder.Quantity;
 
       Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] SELL (price = {price})");
 
-      // adjust quantity to be greater or equal the quotePerGrid
-      while (price.RoundDown(market.BaseAssetPrecision) * quantity.RoundDown(market.QuoteAssetPrecision) < quote)
-        price *= 1.001m;
-
-      IOrder order = await market
+      IOrder order = market
         .Sell(quantity)
         .For(price)
-        .OnExecuted(o => {
-          lock (locker) {
-            var profit = o.ExecutedAmount - buyOrder.ExecutedAmount; // TODO: Add Commission
-            Profit += profit;
-            ClearGrids(hits);
-          }
-          Log.Info($"SOLD [{o}] Profit = {Profit}");
-        })
-        .OnCancel(o => ClearGrids(hits))
-        .SubmitAsync();
+        .OnExecuted(o => Sold(o, hits))
+        .OnCancel(o => EmergencySell(hits))
+        .CancelIf((o, t) => CancelCondition(t))
+        .Submit();
 
       foreach (var hit in hits)
         hit.SellOrder = order;
     }
 
-    private void ClearGrids(IEnumerable<Grid> grids) {
-      foreach (var grid in grids) {
-        grid.BuyOrder = null;
-        grid.SellOrder = null;
-        grid.IsFree = true;
+    private void EmergencySell(IEnumerable<Grid> grids) {
+      if(autoStop) {
+        var qty = grids.Sum(x => x.SellOrder?.ExecutedAmount ?? 0m);
+        market
+          .Sell(qty)
+          .OnExecuted(o => Sold(o, grids))
+          .Submit();
       }
     }
 
-    private decimal GetQuantity(decimal quote, decimal price) => quote / price;
-    private decimal AddSellThreshold(decimal price) => price * (1m + sellThreshold);
+    private void Sold(IOrder sellOrder, IEnumerable<Grid> hits) {
+      Profit += sellOrder.ExecutedAmount;
+      foreach (var hit in hits)
+        hit.SellOrder = null;
+      Log.Info($"SOLD [{sellOrder}] Profit = {Profit}");
+    }
 
     private void PrintGrids() {
       foreach (var grid in grids)
