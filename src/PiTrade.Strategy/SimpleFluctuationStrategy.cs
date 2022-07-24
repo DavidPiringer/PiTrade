@@ -4,21 +4,24 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange;
+using PiTrade.Exchange.Indicators;
 
 namespace PiTrade.Strategy {
   public class SimpleFluctuationStrategy {
     private readonly IMarket market;
+    private readonly MovingAverageConvergenceDivergence macd;
     private readonly decimal amountPerBuy;
-    private readonly decimal absoluteFluctuation;
+    private readonly decimal sellMultiplier;
     private readonly decimal emergencyMultiplier;
 
     private decimal profit;
     private Action<ITrade> state;
 
-    public SimpleFluctuationStrategy(IMarket market, decimal amountPerBuy, decimal absoluteFluctuation, decimal emergencyMultiplier = 4) {
+    public SimpleFluctuationStrategy(IMarket market, decimal amountPerBuy, decimal sellMultiplier, decimal emergencyMultiplier) {
       this.market = market;
+      this.macd = new MovingAverageConvergenceDivergence(TimeSpan.FromMinutes(1));
       this.amountPerBuy = amountPerBuy;
-      this.absoluteFluctuation = absoluteFluctuation;
+      this.sellMultiplier = sellMultiplier;
       this.emergencyMultiplier = emergencyMultiplier;
       state = BuyState;
     }
@@ -35,7 +38,10 @@ namespace PiTrade.Strategy {
     private void EmptyState(ITrade trade) { }
 
     private void BuyState(ITrade trade) {
-      var buyPrice = trade.Price - absoluteFluctuation;
+      if (!macd.IsUptrend)
+        return;
+
+      var buyPrice = trade.Price;
       var qty = amountPerBuy / buyPrice;
       Console.WriteLine($"Buy {qty} for {buyPrice}");
       state = EmptyState;
@@ -51,7 +57,7 @@ namespace PiTrade.Strategy {
 
     private void Sell(IOrder buyOrder) {
       profit -= buyOrder.ExecutedAmount;
-      var sellPrice = buyOrder.ExecutedPrice + absoluteFluctuation;
+      var sellPrice = buyOrder.ExecutedPrice + sellMultiplier;
       var qty = buyOrder.ExecutedQuantity;
       Console.WriteLine($"Sell {qty} for {sellPrice}");
       market
@@ -79,7 +85,8 @@ namespace PiTrade.Strategy {
     }
 
     private bool CheckEmergencySell(IOrder sellOrder, ITrade trade) => 
-      trade.Price < (sellOrder.Price - absoluteFluctuation * emergencyMultiplier);
+      trade.Price < (sellOrder.Price - emergencyMultiplier);
+
     private void HandleError(IOrder order, Exception ex) {
       Console.WriteLine($"An Error occured! -> {ex.Message}");
     }
