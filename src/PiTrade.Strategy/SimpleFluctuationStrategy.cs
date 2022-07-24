@@ -33,7 +33,10 @@ namespace PiTrade.Strategy {
       market.Unsubscribe(OnTrade);
     }
 
-    private void OnTrade(ITrade trade) => state(trade);
+    private void OnTrade(ITrade trade) {
+      macd.OnTrade(trade);
+      state(trade);
+    }
 
     private void EmptyState(ITrade trade) { }
 
@@ -73,7 +76,11 @@ namespace PiTrade.Strategy {
     private void Sold(IOrder sellOrder) {
       profit += sellOrder.ExecutedAmount;
       Console.WriteLine($"Profit = {profit}");
-      state = BuyState;
+      if(profit > -2m)
+        state = BuyState;
+      else {
+        Console.WriteLine("Shutdown, to much loss!");
+      }
     }
 
     private void EmergencySell(IOrder sellOrder) {
@@ -85,7 +92,7 @@ namespace PiTrade.Strategy {
     }
 
     private bool CheckEmergencySell(IOrder sellOrder, ITrade trade) => 
-      trade.Price < (sellOrder.Price - emergencyMultiplier);
+      trade.Price < (sellOrder.Price - emergencyMultiplier) || !macd.IsUptrend;
 
     private void HandleError(IOrder order, Exception ex) {
       Console.WriteLine($"An Error occured! -> {ex.Message}");
