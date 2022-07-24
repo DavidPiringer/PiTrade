@@ -36,7 +36,7 @@ namespace PiTrade.Exchange.Indicators {
     protected abstract decimal Calculate(IEnumerable<decimal> values);
 
     public void OnTrade(ITrade trade) => OnTrade(trade.Price);
-    public void OnTrade(decimal value) {
+    public virtual void OnTrade(decimal value) {
       // set lastPrice to price for initialization
       if (lastPrice == decimal.MinValue) lastPrice = value;
 
