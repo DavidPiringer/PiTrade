@@ -99,7 +99,10 @@ namespace PiTrade.Strategy {
       profit += sellOrder.ExecutedAmount;
       curHoldingQty -= sellOrder.ExecutedQuantity;
       Console.WriteLine($"Profit = {profit}");
-      state = BuyState;
+      if(profit > -1m)
+        state = BuyState;
+      else
+        Console.WriteLine("Shutdown, to much loss!");
     }
   }
 }
