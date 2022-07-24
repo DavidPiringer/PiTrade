@@ -11,25 +11,20 @@ namespace PiTrade.Strategy {
     private readonly IMarket market;
     private readonly decimal amountPerBuy;
     private readonly IIndicator posMomentumVerification;
-    private readonly IIndicator slow;
-    private readonly IIndicator fast;
-    private readonly IIndicator signal;
+    private readonly MovingAverageConvergenceDivergence macd;
 
     private decimal profit;
     private decimal curHoldingQty;
     private decimal lastMACDSignalDiff;
     private Action<ITrade> state;
 
-    private decimal MACD => fast.Value - slow.Value;
     
 
     public MACDStrategy(IMarket market, decimal amountPerBuy, TimeSpan interval, uint maxTicksPosMomentumVerification, uint maxTicksSlow = 26, uint maxTicksFast = 12, uint maxTicksSignal = 7) {
       this.market = market;
       this.amountPerBuy = amountPerBuy;
       this.posMomentumVerification = new ExponentialMovingAverage(interval, maxTicksPosMomentumVerification);
-      this.slow = new ExponentialMovingAverage(interval, maxTicksSlow);
-      this.fast = new ExponentialMovingAverage(interval, maxTicksFast);
-      this.signal = new SimpleMovingAverage(interval, maxTicksSignal);
+      this.macd = new MovingAverageConvergenceDivergence(interval, maxTicksSlow, maxTicksFast, maxTicksSignal);
       state = BuyState;
     }
 
@@ -42,11 +37,12 @@ namespace PiTrade.Strategy {
     }
 
     private bool IsBuySignal(decimal curPrice) {
-      var signalLine = signal.Value;
-      var macdSignalDiff = MACD - signalLine;
+      var macdVal = macd.Value;
+      var signalVal = macd.Signal;
+      var macdSignalDiff = macdVal - signalVal;
       var res =
-        MACD < 0 &&
-        signalLine < 0 &&
+        macdVal < 0 &&
+        signalVal < 0 &&
         lastMACDSignalDiff < 0 &&
         macdSignalDiff >= 0 && 
         posMomentumVerification.Value < curPrice;
@@ -55,18 +51,13 @@ namespace PiTrade.Strategy {
     }
 
     private bool IsSellSignal(decimal curPrice) {
-      var signalLine = signal.Value;
       return
-        MACD < signalLine ||
+        !macd.IsUptrend ||
         curPrice < posMomentumVerification.Value;
-
     }
 
     private void OnTrade(ITrade trade) {
-      slow.OnTrade(trade);
-      fast.OnTrade(trade);
-      signal.OnTrade(MACD);
-      if (slow.IsReady && fast.IsReady && signal.IsReady)
+      if (macd.IsReady && posMomentumVerification.IsReady)
         state(trade);
     }
 
@@ -75,7 +66,7 @@ namespace PiTrade.Strategy {
     private void BuyState(ITrade trade) {
       if(IsBuySignal(trade.Price)) {
         state = EmptyState;
-        var buyPrice = fast.Value;
+        var buyPrice = macd.FastValue;
         var qty = amountPerBuy / buyPrice;
         Console.WriteLine($"Buy {qty} for ~{buyPrice}");
         market
@@ -96,7 +87,7 @@ namespace PiTrade.Strategy {
     private void SellState(ITrade trade) {
       if(IsSellSignal(trade.Price)) {
         state = EmptyState;
-        var sellPrice = fast.Value;
+        var sellPrice = macd.FastValue;
         Console.WriteLine($"Sell {curHoldingQty} for ~{sellPrice}");
         market
           .Sell(curHoldingQty)
