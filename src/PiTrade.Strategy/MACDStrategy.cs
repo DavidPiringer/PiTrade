@@ -20,7 +20,7 @@ namespace PiTrade.Strategy {
 
     
 
-    public MACDStrategy(IMarket market, decimal amountPerBuy, TimeSpan interval, uint maxTicksPosMomentumVerification, uint maxTicksSlow = 26, uint maxTicksFast = 12, uint maxTicksSignal = 7) {
+    public MACDStrategy(IMarket market, decimal amountPerBuy, TimeSpan interval, uint maxTicksPosMomentumVerification = 200, uint maxTicksSlow = 30, uint maxTicksFast = 14, uint maxTicksSignal = 14) {
       this.market = market;
       this.amountPerBuy = amountPerBuy;
       this.posMomentumVerification = new ExponentialMovingAverage(interval, maxTicksPosMomentumVerification);
@@ -44,16 +44,14 @@ namespace PiTrade.Strategy {
         macdVal < 0 &&
         signalVal < 0 &&
         lastMACDSignalDiff < 0 &&
-        macdSignalDiff >= 0 && 
-        posMomentumVerification.Value < curPrice;
+        macdSignalDiff >= 0 &&
+        curPrice < posMomentumVerification.Value;
       lastMACDSignalDiff = macdSignalDiff;
       return res;
     }
 
     private bool IsSellSignal(decimal curPrice) {
-      return
-        !macd.IsUptrend ||
-        curPrice < posMomentumVerification.Value;
+      return !macd.IsUptrend;
     }
 
     private void OnTrade(ITrade trade) {
