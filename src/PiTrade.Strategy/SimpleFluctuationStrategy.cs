@@ -78,9 +78,8 @@ namespace PiTrade.Strategy {
       Console.WriteLine($"Profit = {profit}");
       if(profit > -2m)
         state = BuyState;
-      else {
+      else
         Console.WriteLine("Shutdown, to much loss!");
-      }
     }
 
     private void EmergencySell(IOrder sellOrder) {
