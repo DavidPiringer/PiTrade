@@ -55,6 +55,7 @@ namespace PiTrade.Strategy {
     }
 
     private void OnTrade(ITrade trade) {
+      macd.OnTrade(trade);
       if (macd.IsReady && posMomentumVerification.IsReady)
         state(trade);
     }
