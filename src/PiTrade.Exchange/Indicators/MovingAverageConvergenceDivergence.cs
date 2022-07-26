@@ -20,7 +20,7 @@ namespace PiTrade.Exchange.Indicators {
 
     public MovingAverageConvergenceDivergence(TimeSpan period, uint slowMaxTicks = 26, uint fastMaxTicks = 12, uint signalMaxTicks = 7, IndicatorValueType indicatorValueType = IndicatorValueType.Typical)
       : base(period, slowMaxTicks, indicatorValueType) {
-      slow = new ExponentialMovingAverage(period, signalMaxTicks, indicatorValueType);
+      slow = new ExponentialMovingAverage(period, slowMaxTicks, indicatorValueType);
       fast = new ExponentialMovingAverage(period, fastMaxTicks, indicatorValueType);
       signal = new SimpleMovingAverage(period, signalMaxTicks, indicatorValueType);
     }
@@ -28,10 +28,12 @@ namespace PiTrade.Exchange.Indicators {
     public override void OnTrade(decimal value) {
       slow.OnTrade(value);
       fast.OnTrade(value);
-      base.OnTrade(value);
-      signal.OnTrade(Value);
+      if(slow.IsReady && fast.IsReady) {
+        base.OnTrade(fast.Value - slow.Value);
+        signal.OnTrade(Value);
+      }
     }
 
-    protected override decimal Calculate(IEnumerable<decimal> values) => fast.Value - slow.Value;
+    protected override decimal Calculate(IEnumerable<decimal> values) => values.LastOrDefault();
   }
 }
