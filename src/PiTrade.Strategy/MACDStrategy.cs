@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using PiTrade.Exchange;
 using PiTrade.Exchange.Indicators;
+using PiTrade.Logging;
 
 namespace PiTrade.Strategy {
   public class MACDStrategy {
@@ -29,10 +30,12 @@ namespace PiTrade.Strategy {
     }
 
     public void Start() {
+      Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] START");
       market.Subscribe(OnTrade);
     }
 
     public void Stop() {
+      Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] STOP");
       market.Unsubscribe(OnTrade);
     }
 
@@ -59,6 +62,9 @@ namespace PiTrade.Strategy {
       posMomentumVerification.OnTrade(trade);
       if (macd.IsReady && posMomentumVerification.IsReady)
         state(trade);
+      else {
+        Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] WARMING UP ...");
+      }
     }
 
     private void EmptyState(ITrade trade) { }
@@ -68,17 +74,21 @@ namespace PiTrade.Strategy {
         state = EmptyState;
         var buyPrice = macd.FastValue;
         var qty = amountPerBuy / buyPrice;
-        Console.WriteLine($"Buy {qty} for ~{buyPrice}");
+        Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] BUY {qty} @ MARKET");
         market
           .Buy(qty)
           .OnExecuted(Bought)
-          .OnError((o,e) => state = BuyState)
+          .OnError((o,e) => {
+            state = BuyState;
+            Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] ERROR @ BUY");
+          })
           .Submit();
       }
  
     }
 
     private void Bought(IOrder buyOrder) {
+      Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] BOUGHT {buyOrder}");
       profit -= buyOrder.ExecutedAmount;
       curHoldingQty += buyOrder.ExecutedQuantity;
       state = SellState;
@@ -88,23 +98,29 @@ namespace PiTrade.Strategy {
       if(IsSellSignal(trade.Price)) {
         state = EmptyState;
         var sellPrice = macd.FastValue;
-        Console.WriteLine($"Sell {curHoldingQty} for ~{sellPrice}");
+        Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] SELL {curHoldingQty} @ MARKET");
         market
           .Sell(curHoldingQty)
           .OnExecuted(Sold)
-          .OnError((o, e) => state = SellState)
+          .OnError((o, e) => {
+            state = SellState;
+            Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] ERROR @ SELL");
+          })
           .Submit();
       }
     }
 
     private void Sold(IOrder sellOrder) {
+      Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] SOLD {sellOrder}");
       profit += sellOrder.ExecutedAmount;
       curHoldingQty -= sellOrder.ExecutedQuantity;
-      Console.WriteLine($"Profit = {profit}");
-      if(profit > -1m)
+      Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] PROFIT = {profit}");
+      if (profit > -1m)
         state = BuyState;
-      else
-        Console.WriteLine("Shutdown, to much loss!");
+      else {
+        Log.Warn($"[{market.QuoteAsset}{market.BaseAsset}] SHUTDOWN - LOSS TOO HIGH");
+        Stop();
+      }
     }
   }
 }
