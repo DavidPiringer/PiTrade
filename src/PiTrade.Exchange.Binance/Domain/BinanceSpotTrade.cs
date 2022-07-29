@@ -5,8 +5,8 @@ using PiTrade.Exchange.Entities;
 namespace PiTrade.Exchange.Binance.Domain {
   [JsonObject(MemberSerialization.OptIn)]
   internal class BinanceSpotTrade : ITrade {
-    [JsonProperty(PropertyName = "E", ItemConverterType = typeof(UnixDateTimeConverter))]
-    public DateTime Timestamp { get; set; }
+    [JsonProperty(PropertyName = "E")]
+    public long UnixEpoch { get; set; }
 
     [JsonProperty(PropertyName = "s")]
     public string? Symbol { get; set; }

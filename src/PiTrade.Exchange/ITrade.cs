@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace PiTrade.Exchange {
   public interface ITrade {
-    DateTime Timestamp { get; set; }
+    long UnixEpoch { get; set; }
     decimal Price { get; set; }
     decimal Quantity { get; set; }
     public long OIDBuyer { get; set; }
