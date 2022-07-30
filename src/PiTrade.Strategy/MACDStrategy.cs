@@ -11,32 +11,40 @@ namespace PiTrade.Strategy {
   public class MACDStrategy {
     private readonly IMarket market;
     private readonly decimal amountPerBuy;
+    private readonly decimal maxLoss;
+    private readonly bool includeProfitToAmountPerBuy;
     private readonly IIndicator posMomentumVerification;
     private readonly MovingAverageConvergenceDivergence macd;
 
     private decimal profit;
+    private decimal curAmountPerBuy;
     private decimal curHoldingQty;
     private decimal lastMACDSignalDiff;
     private Action<ITrade> state;
 
     
 
-    public MACDStrategy(IMarket market, decimal amountPerBuy, TimeSpan interval, uint maxTicksPosMomentumVerification = 200, uint maxTicksSlow = 30, uint maxTicksFast = 14, uint maxTicksSignal = 14) {
+    public MACDStrategy(IMarket market, decimal amountPerBuy, decimal maxLoss, bool includeProfitToAmountPerBuy, TimeSpan interval, uint maxTicksPosMomentumVerification = 200, uint maxTicksSlow = 30, uint maxTicksFast = 14, uint maxTicksSignal = 14) {
       this.market = market;
       this.amountPerBuy = amountPerBuy;
+      this.curAmountPerBuy = amountPerBuy;
+      this.maxLoss = -1m * Math.Abs(maxLoss); //make sure maxLoss is negative
+      this.includeProfitToAmountPerBuy = includeProfitToAmountPerBuy;
       this.posMomentumVerification = new ExponentialMovingAverage(interval, maxTicksPosMomentumVerification);
       this.macd = new MovingAverageConvergenceDivergence(interval, maxTicksSlow, maxTicksFast, maxTicksSignal);
       state = BuyState;
     }
 
+    public override string ToString() => $"AmountPerBuy = {amountPerBuy}, MaximalLoss = {maxLoss}, IncludeProfitToAmountPerBuy = {includeProfitToAmountPerBuy}";
+
     public void Start() {
-      Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] START");
+      Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] START [{ToString()}]");
       state = BuyState;
       market.Subscribe(OnTrade);
     }
 
     public void Stop() {
-      Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] STOP");
+      Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] STOP [{ToString()}]");
       state = EmptyState;
       market.Unsubscribe(OnTrade);
     }
@@ -75,7 +83,7 @@ namespace PiTrade.Strategy {
       if(IsBuySignal(trade.Price)) {
         state = EmptyState;
         var buyPrice = macd.FastValue;
-        var qty = amountPerBuy / buyPrice;
+        var qty = curAmountPerBuy / buyPrice;
         Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] BUY {qty} @ MARKET");
         market
           .Buy(qty)
@@ -116,8 +124,10 @@ namespace PiTrade.Strategy {
       Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] SOLD {sellOrder}");
       profit += sellOrder.ExecutedAmount;
       curHoldingQty -= sellOrder.ExecutedQuantity;
-      Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] PROFIT = {profit}");
-      if (profit > -1m)
+      if (includeProfitToAmountPerBuy)
+        curAmountPerBuy = amountPerBuy + profit;
+      Log.Info($"[{market.QuoteAsset}{market.BaseAsset}] PROFIT = {profit}, CurAmountPerBuy = {curAmountPerBuy}");
+      if (profit > maxLoss)
         state = BuyState;
       else {
         Log.Warn($"[{market.QuoteAsset}{market.BaseAsset}] SHUTDOWN - LOSS TOO HIGH");
