@@ -12,7 +12,7 @@ namespace PiTrade.Exchange.Indicators {
     protected readonly IndicatorValueType valueType;
     private readonly Queue<decimal> values;
 
-    private DateTime lastPeriod = DateTime.Now;
+    private DateTimeOffset lastPeriod;
     private IList<decimal> currentPeriod = new List<decimal>();
     private decimal lastPrice = decimal.MinValue;
     private uint tick = 0;
@@ -25,24 +25,35 @@ namespace PiTrade.Exchange.Indicators {
     public decimal Variance { get; private set; }
     public decimal StandardDeviation { get; private set; }
 
+    //private bool 
+
     public Indicator(TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
       valueType = indicatorValueType;
       values = new Queue<decimal>((int)maxTicks);
       MaxTicks = maxTicks;
       Period = period;
-      //this.market.Subscribe(t => OnPriceUpdate(market, t.Price));
+
+      // round to last period 
+      var tmp = DateTimeOffset.Now;
+      var sub = tmp.ToUnixTimeSeconds() % ((long)period.TotalSeconds);
+      lastPeriod = DateTimeOffset.FromUnixTimeSeconds(tmp.ToUnixTimeSeconds() - sub);
     }
 
     protected abstract decimal Calculate(IEnumerable<decimal> values);
 
-    public void OnTrade(ITrade trade) => OnTrade(trade.Price);
-    public virtual void OnTrade(decimal value) {
-      // set lastPrice to price for initialization
+    public void OnTrade(ITrade trade) => OnTrade(trade.Price, trade.UnixEpoch);
+    public virtual void OnTrade(decimal value, long unixEpoch) {
+      var offset = DateTimeOffset.FromUnixTimeMilliseconds(unixEpoch);
+
+      // set lastPrice to price and lastEpoch to epoch for initialization
       if (lastPrice == decimal.MinValue) lastPrice = value;
 
+      // throw error if an invalid (older) epoch is passed
+      if (lastPeriod.CompareTo(offset) > 0) throw new ArgumentException("Cannot add older unixEpoch");
+      
       // loop through periods if the last update is older than 'Period'
       Queue<PriceCandle> candles = new Queue<PriceCandle>();
-      while (lastPeriod.Add(Period).CompareTo(DateTime.Now) <= 0) {
+      while (lastPeriod.Add(Period).CompareTo(offset) <= 0) {
         // if currentPeriod contains nothing -> add the lastPrice
         if (!currentPeriod.Any()) currentPeriod.Add(lastPrice);
         candles.Enqueue(new PriceCandle(currentPeriod.ToArray(), lastPeriod, Period));
@@ -54,9 +65,7 @@ namespace PiTrade.Exchange.Indicators {
       while(candles.Count > 0)
         AddCandle(candles.Dequeue());
 
-      // update periods and lastPrice
-      if (lastPeriod.Add(Period).CompareTo(DateTime.Now) < 0)
-        lastPeriod = DateTime.Now;
+      // update lastPrice
       lastPrice = value;
 
       // add price to current period

@@ -21,6 +21,6 @@ namespace PiTrade.Exchange.Indicators {
     /// <summary>
     /// Call this method to update the indicator value.
     /// </summary>
-    void OnTrade(decimal value);
+    void OnTrade(decimal value, long unixEpoch);
   }
 }

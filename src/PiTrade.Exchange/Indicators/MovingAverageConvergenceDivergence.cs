@@ -25,12 +25,12 @@ namespace PiTrade.Exchange.Indicators {
       signal = new SimpleMovingAverage(period, signalMaxTicks, indicatorValueType);
     }
 
-    public override void OnTrade(decimal value) {
-      slow.OnTrade(value);
-      fast.OnTrade(value);
+    public override void OnTrade(decimal value, long unixEpoch) {
+      slow.OnTrade(value, unixEpoch);
+      fast.OnTrade(value, unixEpoch);
       if(slow.IsReady && fast.IsReady) {
-        base.OnTrade(fast.Value - slow.Value);
-        signal.OnTrade(Value);
+        base.OnTrade(fast.Value - slow.Value, unixEpoch);
+        signal.OnTrade(Value, unixEpoch);
       }
     }
 
