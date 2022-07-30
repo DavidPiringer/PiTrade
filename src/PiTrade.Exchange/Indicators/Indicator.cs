@@ -25,8 +25,6 @@ namespace PiTrade.Exchange.Indicators {
     public decimal Variance { get; private set; }
     public decimal StandardDeviation { get; private set; }
 
-    //private bool 
-
     public Indicator(TimeSpan period, uint maxTicks = 100, IndicatorValueType indicatorValueType = IndicatorValueType.Close) {
       valueType = indicatorValueType;
       values = new Queue<decimal>((int)maxTicks);
