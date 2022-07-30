@@ -31,11 +31,13 @@ namespace PiTrade.Strategy {
 
     public void Start() {
       Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] START");
+      state = BuyState;
       market.Subscribe(OnTrade);
     }
 
     public void Stop() {
       Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] STOP");
+      state = EmptyState;
       market.Unsubscribe(OnTrade);
     }
 
