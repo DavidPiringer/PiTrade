@@ -138,8 +138,13 @@ namespace PiTrade.Exchange.Binance {
     private void StartMarketWS(IMarket market, IEnumerable<Action<ITrade>> subs) {
       WebSocket socket = new WebSocket(new Uri($"{WSBaseUri}/{MarketString(market).ToLower()}@trade"));
       socket.OnMessage(msg => ProcessTradeMessage(msg, subs));
+      socket.OnError(LogError);
       socket.Connect().Wait();
       sockets.Add(socket);
+    }
+
+    private void LogError(Exception err) {
+      Log.Error(err.Message);
     }
 
     private void ProcessTradeMessage(string msg, IEnumerable<Action<ITrade>> subs) {
