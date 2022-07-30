@@ -5,6 +5,9 @@ using PiTrade.Exchange.Entities;
 namespace PiTrade.Exchange.Binance.Domain {
   [JsonObject(MemberSerialization.OptIn)]
   internal class BinanceSpotTrade : ITrade {
+    [JsonProperty(PropertyName = "e")]
+    public string? MessageType { get; set; }
+
     [JsonProperty(PropertyName = "E")]
     public long UnixEpoch { get; set; }
 
