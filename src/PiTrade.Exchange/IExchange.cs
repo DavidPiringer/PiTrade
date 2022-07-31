@@ -24,6 +24,9 @@ namespace PiTrade.Exchange {
 
     Task<bool> CancelOrder(IMarket market, long orderId);
 
+    Task<IEnumerable<PriceCandle>> GetMarketData(
+      IMarket market, PriceCandleInterval interval, int limit);
+
     void Subscribe(IMarket market, Action<ITrade> onTrade);
     void Unsubscribe(IMarket market, Action<ITrade> onTrade);
 

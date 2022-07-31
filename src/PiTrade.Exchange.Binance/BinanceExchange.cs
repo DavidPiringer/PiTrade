@@ -83,7 +83,29 @@ namespace PiTrade.Exchange.Binance {
       Markets = markets;
     }
 
-#region IExchange Members
+    #region IExchange Members
+    public async Task<IEnumerable<PriceCandle>> GetMarketData(IMarket market, PriceCandleInterval interval, int limit) {
+      var res = await client.Send<IEnumerable<object[]>>("/api/v3/klines", HttpMethod.Get, new Dictionary<string, object>()
+      {
+        {"symbol", MarketString(market) },
+        {"interval", Map(interval)},
+        {"limit", limit },
+      });
+      IList<PriceCandle> marketData = new List<PriceCandle>();
+      if (res != null) { 
+        foreach (var candle in res) {
+          var start = DateTimeOffset.FromUnixTimeMilliseconds((long)candle[0]);
+          var end = DateTimeOffset.FromUnixTimeMilliseconds((long)candle[6]);
+          var open = decimal.Parse((string)candle[1]);
+          var high = decimal.Parse((string)candle[2]);
+          var low = decimal.Parse((string)candle[3]);
+          var close = decimal.Parse((string)candle[4]);
+          marketData.Add(new PriceCandle(new[] { open, high, low, close }, start, end));
+        }
+      }
+      return marketData.ToArray();
+    }
+
     public async Task<bool> CancelOrder(IMarket market, long orderId) {
       var res = await client.SendSigned("/api/v3/order", HttpMethod.Delete, new Dictionary<string, object>()
       { 
@@ -117,7 +139,6 @@ namespace PiTrade.Exchange.Binance {
       return CreateOrderCreationResult(response);
     }
 
-    private static string MarketString(IMarket market) => $"{market.BaseAsset}{market.QuoteAsset}".ToUpper();
 
     public void Subscribe(IMarket market, Action<ITrade> onTrade) {
       if (!tradeSubscriptions.ContainsKey(market)) { 
@@ -169,7 +190,18 @@ namespace PiTrade.Exchange.Binance {
         MatchedOrders = matches
       };
     }
-      
+
+
+    private static string MarketString(IMarket market) => $"{market.BaseAsset}{market.QuoteAsset}".ToUpper();
+
+    private static string Map(PriceCandleInterval interval) => interval switch {
+      PriceCandleInterval.Minute1 => "1m",
+      PriceCandleInterval.Minute3 => "3m",
+      PriceCandleInterval.Minute5 => "5m",
+      PriceCandleInterval.Hour1 => "1h",
+      _ => throw new NotImplementedException()
+    };
+
 
     #region IDisposable Members
     private bool disposedValue;
