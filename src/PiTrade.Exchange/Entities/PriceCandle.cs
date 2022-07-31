@@ -9,10 +9,10 @@ namespace PiTrade.Exchange.Entities {
     public DateTimeOffset Start { get; }
     public DateTimeOffset End { get; }
 
-    public virtual decimal Open { get; }
-    public virtual decimal Close { get; }
-    public virtual decimal Max { get; }
-    public virtual decimal Min { get; }
+    public decimal Open { get; }
+    public decimal Close { get; }
+    public decimal Max { get; }
+    public decimal Min { get; }
     public decimal Typical => (Min + Max + Close) / 3.0m;
 
     public PriceCandle(decimal[] values, DateTimeOffset start, DateTimeOffset end) {
