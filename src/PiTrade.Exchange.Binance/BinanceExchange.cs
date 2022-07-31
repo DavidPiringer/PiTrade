@@ -84,7 +84,7 @@ namespace PiTrade.Exchange.Binance {
     }
 
     #region IExchange Members
-    public async Task<IEnumerable<PriceCandle>> GetMarketData(IMarket market, PriceCandleInterval interval, int limit) {
+    public async Task<IEnumerable<PriceCandle>> GetMarketData(IMarket market, PriceCandleInterval interval, uint limit) {
       var res = await client.Send<IEnumerable<object[]>>("/api/v3/klines", HttpMethod.Get, new Dictionary<string, object>()
       {
         {"symbol", MarketString(market) },

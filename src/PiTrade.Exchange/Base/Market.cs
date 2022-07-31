@@ -30,7 +30,7 @@ namespace PiTrade.Exchange.Base {
 
     public IOrder Buy(decimal quantity) => new Order(this, OrderSide.BUY, quantity);
 
-    public Task<IEnumerable<PriceCandle>> GetMarketData(PriceCandleInterval interval, int limit) => Exchange.GetMarketData(this, interval, limit);
+    public Task<IEnumerable<PriceCandle>> GetMarketData(PriceCandleInterval interval, uint limit) => Exchange.GetMarketData(this, interval, limit);
 
     public void Subscribe(Action<ITrade> onTrade) => 
       Exchange.Subscribe(this, onTrade); 

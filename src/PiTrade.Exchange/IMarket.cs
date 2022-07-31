@@ -44,7 +44,7 @@ namespace PiTrade.Exchange {
     /// <param name="interval">Interval for price candles</param>
     /// <param name="limit">how many candles should be fetched from now to past</param>
     /// <returns>enumerable of price candles</returns>
-    Task<IEnumerable<PriceCandle>> GetMarketData(PriceCandleInterval interval, int limit);
+    Task<IEnumerable<PriceCandle>> GetMarketData(PriceCandleInterval interval, uint limit);
 
     void Subscribe(Action<ITrade> onTrade);
     void SubscribeAsync(Func<ITrade,Task> onTrade);
