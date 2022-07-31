@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using PiTrade.Exchange.Entities;
 using PiTrade.Exchange.Enums;
 
 namespace PiTrade.Exchange.Indicators {
@@ -19,7 +20,7 @@ namespace PiTrade.Exchange.Indicators {
     public bool IsUptrend => slow.IsReady && fast.IsReady && signal.IsReady && Value > Signal;
 
     public MovingAverageConvergenceDivergence(TimeSpan period, uint slowMaxTicks = 26, uint fastMaxTicks = 12, uint signalMaxTicks = 7, IndicatorValueType indicatorValueType = IndicatorValueType.Typical)
-      : base(period, slowMaxTicks, indicatorValueType) {
+      : base(period, (slowMaxTicks + signalMaxTicks), indicatorValueType) {
       slow = new ExponentialMovingAverage(period, slowMaxTicks, indicatorValueType);
       fast = new ExponentialMovingAverage(period, fastMaxTicks, indicatorValueType);
       signal = new SimpleMovingAverage(period, signalMaxTicks, indicatorValueType);
@@ -31,6 +32,14 @@ namespace PiTrade.Exchange.Indicators {
       if(slow.IsReady && fast.IsReady) {
         base.Add(fast.Value - slow.Value, unixEpoch);
         signal.Add(Value, unixEpoch);
+      }
+    }
+    public override void Add(PriceCandle candle) {
+      slow.Add(candle);
+      fast.Add(candle);
+      if (slow.IsReady && fast.IsReady) {
+        base.Add(fast.Value - slow.Value, candle.Start.ToUnixTimeMilliseconds());
+        signal.Add(Value, candle.Start.ToUnixTimeMilliseconds());
       }
     }
 
