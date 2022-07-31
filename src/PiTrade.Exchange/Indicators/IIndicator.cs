@@ -17,10 +17,14 @@ namespace PiTrade.Exchange.Indicators {
     /// <summary>
     /// Call this method to update the indicator value.
     /// </summary>
-    void OnTrade(ITrade trade);
+    void Add(ITrade trade);
     /// <summary>
     /// Call this method to update the indicator value.
     /// </summary>
-    void OnTrade(decimal value, long unixEpoch);
+    void Add(decimal value, long unixEpoch);
+    /// <summary>
+    /// Call this method to update the indicator value.
+    /// </summary>
+    void Add(PriceCandle candle);
   }
 }

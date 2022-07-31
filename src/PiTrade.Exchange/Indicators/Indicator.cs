@@ -12,7 +12,7 @@ namespace PiTrade.Exchange.Indicators {
     protected readonly IndicatorValueType valueType;
     private readonly Queue<decimal> values;
 
-    private DateTimeOffset lastPeriod;
+    private DateTimeOffset lastPeriod = DateTimeOffset.MinValue;
     private IList<decimal> currentPeriod = new List<decimal>();
     private decimal lastPrice = decimal.MinValue;
     private uint tick = 0;
@@ -32,19 +32,29 @@ namespace PiTrade.Exchange.Indicators {
       Period = period;
 
       // round to last period 
-      var tmp = DateTimeOffset.Now;
-      var sub = tmp.ToUnixTimeSeconds() % ((long)period.TotalSeconds);
-      lastPeriod = DateTimeOffset.FromUnixTimeSeconds(tmp.ToUnixTimeSeconds() - sub);
+      
     }
 
     protected abstract decimal Calculate(IEnumerable<decimal> values);
 
-    public void OnTrade(ITrade trade) => OnTrade(trade.Price, trade.UnixEpoch);
-    public virtual void OnTrade(decimal value, long unixEpoch) {
+    public void Add(ITrade trade) => Add(trade.Price, trade.UnixEpoch);
+
+    public void Add(PriceCandle candle) {
+      Add(candle.Open, candle.Start.ToUnixTimeMilliseconds());
+      Add(candle.Max, candle.Start.ToUnixTimeMilliseconds());
+      Add(candle.Min, candle.Start.ToUnixTimeMilliseconds());
+      Add(candle.Close, candle.Start.ToUnixTimeMilliseconds());
+    }
+
+    public virtual void Add(decimal value, long unixEpoch) {
       var offset = DateTimeOffset.FromUnixTimeMilliseconds(unixEpoch);
 
-      // set lastPrice to price and lastEpoch to epoch for initialization
+      // set lastPrice and lastPeriod for initialization
       if (lastPrice == decimal.MinValue) lastPrice = value;
+      if (lastPeriod == DateTimeOffset.MinValue) {
+        var sub = unixEpoch % ((long)Period.TotalSeconds);
+        lastPeriod = DateTimeOffset.FromUnixTimeSeconds(unixEpoch - sub);
+      }
 
       // throw error if an invalid (older) epoch is passed
       if (lastPeriod.CompareTo(offset) > 0) throw new ArgumentException("Cannot add older unixEpoch");
@@ -70,6 +80,7 @@ namespace PiTrade.Exchange.Indicators {
       currentPeriod.Add(value);
       PreviewCandle(new PriceCandle(currentPeriod.ToArray(), lastPeriod.Add(Period), lastPeriod.Add(Period).Add(Period)));
     }
+
 
     private decimal Aggregate(PriceCandle candle) =>
       valueType switch {

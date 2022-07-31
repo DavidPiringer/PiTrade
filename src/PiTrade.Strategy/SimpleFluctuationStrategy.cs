@@ -34,7 +34,7 @@ namespace PiTrade.Strategy {
     }
 
     private void OnTrade(ITrade trade) {
-      macd.OnTrade(trade);
+      macd.Add(trade);
       state(trade);
     }
 
