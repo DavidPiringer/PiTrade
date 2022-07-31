@@ -123,7 +123,7 @@ namespace PiTrade.Exchange.Binance {
       if (!tradeSubscriptions.ContainsKey(market)) { 
         var hs = new HashSet<Action<ITrade>>();
         tradeSubscriptions.Add(market, hs);
-        StartMarketWS(market, hs);
+        StartMarketWS(market);
       }
       tradeSubscriptions[market].Add(onTrade);
     }
@@ -135,9 +135,9 @@ namespace PiTrade.Exchange.Binance {
 
 #endregion
 
-    private void StartMarketWS(IMarket market, IEnumerable<Action<ITrade>> subs) {
+    private void StartMarketWS(IMarket market) {
       WebSocket socket = new WebSocket(new Uri($"{WSBaseUri}/{MarketString(market).ToLower()}@trade"));
-      socket.OnMessage(msg => ProcessTradeMessage(msg, subs));
+      socket.OnMessage(msg => ProcessTradeMessage(msg, tradeSubscriptions[market].ToArray()));
       socket.OnError(LogError);
       socket.Connect().Wait();
       sockets.Add(socket);
