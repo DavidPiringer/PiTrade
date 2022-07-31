@@ -15,6 +15,7 @@ namespace PiTrade.Strategy {
     private readonly bool includeProfitToAmountPerBuy;
     private readonly IIndicator posMomentumVerification;
     private readonly MovingAverageConvergenceDivergence macd;
+    private readonly uint maxTicks;
 
     private decimal profit;
     private decimal curAmountPerBuy;
@@ -32,6 +33,7 @@ namespace PiTrade.Strategy {
       this.includeProfitToAmountPerBuy = includeProfitToAmountPerBuy;
       this.posMomentumVerification = new ExponentialMovingAverage(interval, maxTicksPosMomentumVerification);
       this.macd = new MovingAverageConvergenceDivergence(interval, maxTicksSlow, maxTicksFast, maxTicksSignal);
+      this.maxTicks = (new[] { maxTicksPosMomentumVerification, maxTicksFast, maxTicksSlow, maxTicksSignal }).Max();
       state = BuyState;
     }
 
@@ -39,6 +41,13 @@ namespace PiTrade.Strategy {
 
     public void Start() {
       Log.Info($"[MACDStrategy] [{market.QuoteAsset}{market.BaseAsset}] START [{ToString()}]");
+      var task = market.GetMarketData(Exchange.Enums.PriceCandleInterval.Minute1, maxTicks);
+      task.Wait();
+      foreach(var candle in task.Result) {
+        macd.Add(candle);
+        posMomentumVerification.Add(candle);
+      }
+
       state = BuyState;
       market.Subscribe(OnTrade);
     }
