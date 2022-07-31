@@ -38,6 +38,14 @@ namespace PiTrade.Exchange {
     /// <returns>order instance</returns>
     IOrder Buy(decimal quantity);
 
+    /// <summary>
+    /// Fetch old market data
+    /// </summary>
+    /// <param name="interval">Interval for price candles</param>
+    /// <param name="limit">how many candles should be fetched from now to past</param>
+    /// <returns>enumerable of price candles</returns>
+    Task<IEnumerable<PriceCandle>> GetMarketData(PriceCandleInterval interval, int limit);
+
     void Subscribe(Action<ITrade> onTrade);
     void SubscribeAsync(Func<ITrade,Task> onTrade);
 
