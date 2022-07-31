@@ -18,7 +18,7 @@ namespace PiTrade.Exchange.Base {
     public decimal ExecutedPrice => Trades.Count() > 0 ? Trades.Average(x => x.Price) : 0;
     public decimal ExecutedQuantity => Trades.Count() > 0 ? Trades.Sum(x => x.Quantity) : 0;
     public decimal ExecutedAmount => ExecutedQuantity * ExecutedPrice;
-    public IEnumerable<ITrade> Trades => trades;
+    public IEnumerable<ITrade> Trades => trades.ToArray();
 
 
     private Action<IOrder> onExecuted;
@@ -167,7 +167,7 @@ namespace PiTrade.Exchange.Base {
           onExecuted(this);
         onTrade(this, trade);
       }
-      if(cancelIfPredicate(this, trade))
+      if(State == OrderState.Open && cancelIfPredicate(this, trade))
         Cancel();
     }
 
