@@ -54,7 +54,7 @@ namespace PiTrade.Exchange.Indicators {
       while (lastPeriod.Add(Period).CompareTo(offset) <= 0) {
         // if currentPeriod contains nothing -> add the lastPrice
         if (!currentPeriod.Any()) currentPeriod.Add(lastPrice);
-        candles.Enqueue(new PriceCandle(currentPeriod.ToArray(), lastPeriod, Period));
+        candles.Enqueue(new PriceCandle(currentPeriod.ToArray(), lastPeriod, lastPeriod.Add(Period)));
         currentPeriod.Clear();
         lastPeriod = lastPeriod.Add(Period);
       }
@@ -68,18 +68,17 @@ namespace PiTrade.Exchange.Indicators {
 
       // add price to current period
       currentPeriod.Add(value);
-      PreviewCandle(new PriceCandle(currentPeriod.ToArray(), lastPeriod.Add(Period), Period));
+      PreviewCandle(new PriceCandle(currentPeriod.ToArray(), lastPeriod.Add(Period), lastPeriod.Add(Period).Add(Period)));
     }
 
     private decimal Aggregate(PriceCandle candle) =>
       valueType switch {
-        IndicatorValueType.Average => candle.Average,
         IndicatorValueType.Open => candle.Open,
         IndicatorValueType.Close => candle.Close,
         IndicatorValueType.Min => candle.Min,
         IndicatorValueType.Max => candle.Max,
-        IndicatorValueType.Typical => (candle.Min + candle.Max + candle.Close) / 3.0m,
-        _ => candle.Average
+        IndicatorValueType.Typical => candle.Typical,
+        _ => throw new NotImplementedException()
       };
 
     private void AddCandle(PriceCandle candle) {
