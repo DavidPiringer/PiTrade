@@ -29,32 +29,23 @@ namespace PiTrade.Exchange.Indicators {
       valueType = indicatorValueType;
       values = new Queue<decimal>((int)maxTicks);
       MaxTicks = maxTicks;
-      Period = period;
-
-      // round to last period 
-      
+      Period = period;      
     }
 
     protected abstract decimal Calculate(IEnumerable<decimal> values);
 
     public void Add(ITrade trade) => Add(trade.Price, trade.UnixEpoch);
 
-    public void Add(PriceCandle candle) {
-      Add(candle.Open, candle.Start.ToUnixTimeMilliseconds());
-      Add(candle.Max, candle.Start.ToUnixTimeMilliseconds());
-      Add(candle.Min, candle.Start.ToUnixTimeMilliseconds());
-      Add(candle.Close, candle.Start.ToUnixTimeMilliseconds());
+    public virtual void Add(PriceCandle candle) {
+      lastPeriod = candle.Start;
+      lastPrice = Aggregate(candle);
+      AddCandle(candle);
     }
 
     public virtual void Add(decimal value, long unixEpoch) {
       var offset = DateTimeOffset.FromUnixTimeMilliseconds(unixEpoch);
 
-      // set lastPrice and lastPeriod for initialization
-      if (lastPrice == decimal.MinValue) lastPrice = value;
-      if (lastPeriod == DateTimeOffset.MinValue) {
-        var sub = unixEpoch % ((long)Period.TotalSeconds);
-        lastPeriod = DateTimeOffset.FromUnixTimeSeconds(unixEpoch - sub);
-      }
+      Init(value, unixEpoch);
 
       // throw error if an invalid (older) epoch is passed
       if (lastPeriod.CompareTo(offset) > 0) throw new ArgumentException("Cannot add older unixEpoch");
@@ -104,6 +95,15 @@ namespace PiTrade.Exchange.Indicators {
         var avg = values.Average();
         Variance = values.Sum(x => (x - avg) * (x - avg)) / values.Count;
         StandardDeviation = (decimal)Math.Sqrt((double)Variance);
+      }
+    }
+
+    private void Init(decimal value, long unixEpoch) {
+      // set lastPrice and lastPeriod for initialization
+      if (lastPrice == decimal.MinValue) lastPrice = value;
+      if (lastPeriod == DateTimeOffset.MinValue) {
+        var sub = unixEpoch % ((long)Period.TotalMilliseconds);
+        lastPeriod = DateTimeOffset.FromUnixTimeMilliseconds(unixEpoch - sub);
       }
     }
 
